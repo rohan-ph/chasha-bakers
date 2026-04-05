@@ -8,6 +8,8 @@
 
   <img src="https://img.shields.io/badge/Netlify-Deployment-00AD9F?style=for-the-badge&logo=netlify&logoColor=white" alt="Netlify">
   <img src="https://img.shields.io/badge/GitHub-Repo-black?style=for-the-badge&logo=github" alt="GitHub">
+  <br><br>
+  <a href="https://chashabakers.netlify.app/"><strong>🌐 Live Site Demo</strong></a>
 </div>
 
 ---
@@ -66,5 +68,6 @@
 ### 🌐 Deployment
 
 Deployed and managed on **Netlify**.
+- **Live URL**: [https://chashabakers.netlify.app/](https://chashabakers.netlify.app/)
 - **Build Command**: `npm run build`
 - **Publish Directory**: `.next`
