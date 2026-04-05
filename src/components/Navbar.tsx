@@ -20,7 +20,7 @@ export default function Navbar() {
       <div className="nav-container">
         <Link href="/" className="nav-logo">
           <div className="nav-logo-icon">
-            <i className="fas fa-birthday-cake"></i>
+            <img src="/logo.png" alt="Chasha Bakers Logo" width={45} height={45} />
           </div>
           <span className="nav-logo-text">CHASHA BAKERS</span>
         </Link>
