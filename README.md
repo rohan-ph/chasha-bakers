@@ -7,7 +7,7 @@
   </p>
 
   <img src="https://img.shields.io/badge/Netlify-Deployment-00AD9F?style=for-the-badge&logo=netlify&logoColor=white" alt="Netlify">
-  <img src="https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge" alt="License">
+  
   <img src="https://img.shields.io/badge/GitHub-Repo-black?style=for-the-badge&logo=github" alt="GitHub">
 </div>
 
