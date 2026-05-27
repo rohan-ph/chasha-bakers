@@ -2,6 +2,12 @@
   {
     "name": "Antigravity Test",
     "initial": "A",
+    "text": "This is an automated test of the persistent reviews database!",
+    "rating": 5
+  },
+  {
+    "name": "Antigravity Test",
+    "initial": "A",
     "text": "The best cookies in the world!",
     "rating": 5
   },
