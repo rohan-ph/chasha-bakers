@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
+import { auth, isFirebaseConfigured } from "../lib/firebase";
+import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
 
 export default function LoginModal() {
   const { showLoginModal, setShowLoginModal, login } = useAuth();
@@ -16,6 +18,10 @@ export default function LoginModal() {
   const [error, setError] = useState("");
   const [showToast, setShowToast] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+
+  // Firebase auth state references
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const [recaptchaVerifier, setRecaptchaVerifier] = useState<RecaptchaVerifier | null>(null);
 
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -39,13 +45,41 @@ export default function LoginModal() {
     }
   }, [step]);
 
+  // Initialize invisible Recaptcha Verifier on component load/open
+  useEffect(() => {
+    if (showLoginModal && isFirebaseConfigured && auth && !recaptchaVerifier) {
+      try {
+        const verifier = new RecaptchaVerifier(auth, "recaptcha-container", {
+          size: "invisible",
+          callback: () => {
+            // reCAPTCHA completed
+          },
+          "expired-callback": () => {
+            setError("reCAPTCHA validation expired. Please try again.");
+          }
+        });
+        setRecaptchaVerifier(verifier);
+      } catch (err: any) {
+        console.error("Recaptcha initialization error:", err);
+      }
+    }
+
+    return () => {
+      if (recaptchaVerifier) {
+        try {
+          recaptchaVerifier.clear();
+          setRecaptchaVerifier(null);
+        } catch (e) {}
+      }
+    };
+  }, [showLoginModal, recaptchaVerifier]);
+
   if (!showLoginModal) return null;
 
-  const handleSendOtp = (e: React.FormEvent) => {
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    // Validate phone (simple 10 digit check)
     const cleanPhone = phone.replace(/\D/g, "");
     if (cleanPhone.length < 10) {
       setError("Please enter a valid 10-digit mobile number.");
@@ -59,25 +93,52 @@ export default function LoginModal() {
 
     setIsLoading(true);
 
-    // Simulate network delay
-    setTimeout(() => {
-      // Generate a 6-digit random mock OTP
-      const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      setMockOtp(generatedOtp);
-      setIsLoading(false);
-      setStep("otp");
-      setTimer(30);
-      setOtp(Array(6).fill(""));
-      
-      // Trigger toast notification
-      setShowToast(true);
+    if (isFirebaseConfigured && auth) {
+      // --- REAL FIREBASE AUTHENTICATION ---
+      const formattedPhone = `+91${cleanPhone}`;
+      try {
+        if (!recaptchaVerifier) {
+          throw new Error("reCAPTCHA verifier not initialized. Please reload the page.");
+        }
+        
+        const confirmation = await signInWithPhoneNumber(auth, formattedPhone, recaptchaVerifier);
+        setConfirmationResult(confirmation);
+        setIsLoading(false);
+        setStep("otp");
+        setTimer(30);
+        setOtp(Array(6).fill(""));
+      } catch (err: any) {
+        console.error("Firebase SMS send failed:", err);
+        setIsLoading(false);
+        
+        // Detailed error decoding for common Firebase issues
+        if (err.code === "auth/invalid-phone-number") {
+          setError("Invalid phone number format. Please check the digits.");
+        } else if (err.code === "auth/too-many-requests") {
+          setError("Too many requests from this number. Please try again later.");
+        } else {
+          setError(`SMS Send Failed: ${err.message || "Unknown error occurred"}`);
+        }
+      }
+    } else {
+      // --- FALLBACK MOCK SIMULATOR ---
       setTimeout(() => {
-        setShowToast(false);
-      }, 8000); // Leave it long enough for the user to read and copy
-    }, 1200);
+        const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+        setMockOtp(generatedOtp);
+        setIsLoading(false);
+        setStep("otp");
+        setTimer(30);
+        setOtp(Array(6).fill(""));
+        
+        setShowToast(true);
+        setTimeout(() => {
+          setShowToast(false);
+        }, 8000);
+      }, 1200);
+    }
   };
 
-  const handleVerifyOtp = (e?: React.FormEvent) => {
+  const handleVerifyOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setError("");
 
@@ -89,83 +150,133 @@ export default function LoginModal() {
 
     setIsLoading(true);
 
-    // Simulate verification delay
-    setTimeout(() => {
-      if (enteredOtp === mockOtp) {
+    if (isFirebaseConfigured && confirmationResult) {
+      // --- REAL FIREBASE VERIFICATION ---
+      try {
+        const userCredential = await confirmationResult.confirm(enteredOtp);
         setIsLoading(false);
         setIsSuccess(true);
-        // Delay closing modal to show success state
         setTimeout(() => {
           login(`+91 ${phone}`, name);
           handleClose();
         }, 1000);
-      } else {
+      } catch (err: any) {
+        console.error("Firebase OTP verification failed:", err);
         setIsLoading(false);
-        setError("Invalid OTP. Please check the notification and try again.");
+        setError("Invalid code. Please check the SMS and try again.");
       }
-    }, 1000);
+    } else {
+      // --- FALLBACK MOCK VERIFICATION ---
+      setTimeout(() => {
+        if (enteredOtp === mockOtp) {
+          setIsLoading(false);
+          setIsSuccess(true);
+          setTimeout(() => {
+            login(`+91 ${phone}`, name);
+            handleClose();
+          }, 1000);
+        } else {
+          setIsLoading(false);
+          setError("Invalid OTP. Please check the notification and try again.");
+        }
+      }, 1000);
+    }
   };
 
   const handleOtpChange = (value: string, index: number) => {
-    // Only allow numbers
     if (value && !/^\d$/.test(value)) return;
 
     const newOtp = [...otp];
     newOtp[index] = value;
     setOtp(newOtp);
 
-    // Move to next input if value is typed
+    // Auto-focus next box
     if (value && index < 5) {
       otpRefs.current[index + 1]?.focus();
     }
 
-    // Auto verify if last digit is typed
+    // Trigger verification if fully filled
     if (newOtp.every(digit => digit !== "")) {
-      // Small timeout to allow input rendering before verifying
       setTimeout(() => {
-        setIsLoading(true);
-        // Call verification directly
         const finalOtp = newOtp.join("");
-        setTimeout(() => {
-          if (finalOtp === mockOtp) {
-            setIsLoading(false);
-            setIsSuccess(true);
-            setTimeout(() => {
-              login(`+91 ${phone}`, name);
-              handleClose();
-            }, 1000);
-          } else {
-            setIsLoading(false);
-            setError("Invalid OTP. Please check the notification and try again.");
-          }
-        }, 800);
+        setIsLoading(true);
+        
+        if (isFirebaseConfigured && confirmationResult) {
+          confirmationResult.confirm(finalOtp)
+            .then(() => {
+              setIsLoading(false);
+              setIsSuccess(true);
+              setTimeout(() => {
+                login(`+91 ${phone}`, name);
+                handleClose();
+              }, 1000);
+            })
+            .catch((err) => {
+              console.error(err);
+              setIsLoading(false);
+              setError("Invalid code. Please check the SMS and try again.");
+            });
+        } else {
+          setTimeout(() => {
+            if (finalOtp === mockOtp) {
+              setIsLoading(false);
+              setIsSuccess(true);
+              setTimeout(() => {
+                login(`+91 ${phone}`, name);
+                handleClose();
+              }, 1000);
+            } else {
+              setIsLoading(false);
+              setError("Invalid OTP. Please check the notification and try again.");
+            }
+          }, 800);
+        }
       }, 50);
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
-    // Move to previous input on backspace
-    if (e.key === "Backspace" && !otp[index] && index > 0) {
-      otpRefs.current[index - 1]?.focus();
+  const handleKeyDown = (valueIndex: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && !otp[valueIndex] && valueIndex > 0) {
+      otpRefs.current[valueIndex - 1]?.focus();
     }
   };
 
-  const handleResendOtp = () => {
+  const handleResendOtp = async () => {
     if (timer > 0) return;
     setError("");
     setIsLoading(true);
 
-    setTimeout(() => {
-      const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      setMockOtp(generatedOtp);
-      setIsLoading(false);
-      setTimer(30);
-      setOtp(Array(6).fill(""));
-      setShowToast(true);
+    if (isFirebaseConfigured && auth) {
+      // --- FIREBASE RESEND ---
+      const formattedPhone = `+91${phone.replace(/\D/g, "")}`;
+      try {
+        if (!recaptchaVerifier) {
+          throw new Error("reCAPTCHA verifier not initialized.");
+        }
+        const confirmation = await signInWithPhoneNumber(auth, formattedPhone, recaptchaVerifier);
+        setConfirmationResult(confirmation);
+        setIsLoading(false);
+        setTimer(30);
+        setOtp(Array(6).fill(""));
+      } catch (err: any) {
+        console.error(err);
+        setIsLoading(false);
+        setError(`Resend Failed: ${err.message || "Unknown error occurred"}`);
+      }
+    } else {
+      // --- MOCK RESEND ---
       setTimeout(() => {
-        setShowToast(false);
-      }, 8000);
-    }, 1000);
+        const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+        setMockOtp(generatedOtp);
+        setIsLoading(false);
+        setTimer(30);
+        setOtp(Array(6).fill(""));
+        setShowToast(true);
+        setTimeout(() => {
+          setShowToast(false);
+        }, 8000);
+      }, 1000);
+    }
   };
 
   const handleClose = () => {
@@ -178,12 +289,16 @@ export default function LoginModal() {
     setError("");
     setShowToast(false);
     setIsSuccess(false);
+    setConfirmationResult(null);
   };
 
   return (
     <div className="login-modal-overlay">
-      {/* Mock SMS Gateway Toast */}
-      {showToast && (
+      {/* Invisible element required by Firebase reCAPTCHA */}
+      <div id="recaptcha-container"></div>
+
+      {/* Mock SMS Gateway Toast (only shown in fallback mock mode) */}
+      {showToast && !isFirebaseConfigured && (
         <div className="sms-gateway-toast">
           <div className="sms-toast-header">
             <span className="sms-toast-icon">💬</span>
@@ -218,6 +333,11 @@ export default function LoginModal() {
                   ? "Enter your details to receive a 6-digit OTP code."
                   : `Enter the code sent to +91 ${phone}`}
               </p>
+              {isFirebaseConfigured && step === "phone" && (
+                <span style={{ fontSize: "0.75rem", color: "#27ae60", fontWeight: 600, display: "block", marginTop: "5px" }}>
+                  🛡️ Firebase SMS Service Active
+                </span>
+              )}
             </div>
 
             {error && <div className="login-error-banner">{error}</div>}
@@ -279,7 +399,7 @@ export default function LoginModal() {
                       pattern="[0-9]*"
                       value={digit}
                       onChange={(e) => handleOtpChange(e.target.value, idx)}
-                      onKeyDown={(e) => handleKeyDown(e, idx)}
+                      onKeyDown={(e) => handleKeyDown(idx, e)}
                       disabled={isLoading}
                       className="otp-digit-input"
                     />
