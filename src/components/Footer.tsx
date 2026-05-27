@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { fetchReviewsFromGitHub, submitReviewToGitHub } from "../lib/githubDb";
 
 const DEFAULT_REVIEWS = [
   { name: "Anitha R.", initial: "A", text: "The chocolate truffle cake was absolutely divine! Best bakery in town. Every order has been consistent in quality. Highly recommend CHASHA BAKERS!", rating: 5 },
@@ -18,31 +19,40 @@ export function Testimonials() {
   const [isSubmitted, setIsSubmitted] = useState(false);
 
   useEffect(() => {
-    // Fetch reviews from API route on load
-    fetch("/api/reviews")
+    // Fetch reviews directly from GitHub Contents API (client-side database bypasses serverless)
+    fetchReviewsFromGitHub()
       .then((res) => {
-        if (!res.ok) throw new Error("API error");
-        return res.json();
-      })
-      .then((data) => {
-        if (Array.isArray(data)) {
-          setReviews(data);
+        if (Array.isArray(res.reviews)) {
+          setReviews(res.reviews);
         } else {
           setReviews(DEFAULT_REVIEWS);
         }
       })
       .catch((err) => {
-        console.error("Failed to load reviews from API, falling back to localStorage/defaults:", err);
-        const saved = localStorage.getItem("chasha_reviews");
-        if (saved) {
-          try {
-            setReviews(JSON.parse(saved));
-          } catch (e) {
-            setReviews(DEFAULT_REVIEWS);
-          }
-        } else {
-          setReviews(DEFAULT_REVIEWS);
-        }
+        console.warn("Client-side direct GitHub load failed, trying /api/reviews fallback:", err);
+        // Fallback: Try local API endpoint
+        fetch("/api/reviews")
+          .then((res) => res.json())
+          .then((data) => {
+            if (Array.isArray(data)) {
+              setReviews(data);
+            } else {
+              throw new Error("Invalid API response format");
+            }
+          })
+          .catch((apiErr) => {
+            console.error("All review API endpoints failed, falling back to localStorage/defaults:", apiErr);
+            const saved = localStorage.getItem("chasha_reviews");
+            if (saved) {
+              try {
+                setReviews(JSON.parse(saved));
+              } catch (e) {
+                setReviews(DEFAULT_REVIEWS);
+              }
+            } else {
+              setReviews(DEFAULT_REVIEWS);
+            }
+          });
       });
   }, []);
 
@@ -58,7 +68,7 @@ export function Testimonials() {
       rating
     };
 
-    // Optimistically update UI immediately for high-performance feel
+    // Optimistically update UI immediately for instant feedback
     setReviews((prev) => [newReview, ...prev]);
 
     // Reset input fields
@@ -71,31 +81,38 @@ export function Testimonials() {
       setIsSubmitted(false);
     }, 4000);
 
-    // Save permanently to database (via GitHub API route)
+    // Save permanently to database (via direct GitHub client API write)
     try {
-      const response = await fetch("/api/reviews", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(newReview),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to save review");
-      }
-
-      // Re-fetch latest list to ensure UI matches the server state exactly
-      const res = await fetch("/api/reviews");
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setReviews(data);
-      }
+      const updatedList = await submitReviewToGitHub(newReview);
+      setReviews(updatedList);
     } catch (err) {
-      console.error("Failed to save review permanently:", err);
-      // Fallback: Save to localStorage as a backup
-      const updatedReviews = [newReview, ...reviews];
-      localStorage.setItem("chasha_reviews", JSON.stringify(updatedReviews));
+      console.warn("Failed direct client-side write to GitHub, falling back to /api/reviews:", err);
+      
+      // Fallback: Attempt local API route POST write
+      try {
+        const response = await fetch("/api/reviews", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(newReview),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to write to fallback API");
+        }
+
+        const res = await fetch("/api/reviews");
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setReviews(data);
+        }
+      } catch (fallbackErr) {
+        console.error("All persistent database writes failed. Saving locally to device:", fallbackErr);
+        // Backup: Save locally so user doesn't lose their input entirely
+        const updatedReviews = [newReview, ...reviews];
+        localStorage.setItem("chasha_reviews", JSON.stringify(updatedReviews));
+      }
     }
   };
 
