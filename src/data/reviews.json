@@ -1,0 +1,26 @@
+[
+  {
+    "name": "Test User",
+    "initial": "T",
+    "text": "This is a test review added programmatically at 2026-05-27T18:44:45.080Z",
+    "rating": 4
+  },
+  {
+    "name": "Anitha R.",
+    "initial": "A",
+    "text": "The chocolate truffle cake was absolutely divine! Best bakery in town. Every order has been consistent in quality. Highly recommend CHASHA BAKERS!",
+    "rating": 5
+  },
+  {
+    "name": "Priya S.",
+    "initial": "P",
+    "text": "Ordered a custom birthday cake for my daughter and it was stunning! The taste was even better than expected. Thank you for making her day special!",
+    "rating": 5
+  },
+  {
+    "name": "Rohan K.",
+    "initial": "R",
+    "text": "Fresh, delicious, and beautifully packaged. The cookies are addictive! I've been ordering weekly for my family. Great service via WhatsApp too!",
+    "rating": 5
+  }
+]
