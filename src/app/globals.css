@@ -503,8 +503,13 @@ nav.scrolled {
 }
 .testimonial-card:hover { transform: translateY(-5px); box-shadow: var(--shadow); }
 .testimonial-quote {
-    font-size: 3rem; color: var(--gold); font-family: 'Playfair Display', serif;
-    line-height: 1; margin-bottom: 8px;
+    position: absolute;
+    top: 24px;
+    right: 24px;
+    font-size: 2.5rem;
+    color: var(--gold-light);
+    opacity: 0.3;
+    line-height: 1;
 }
 .testimonial-text { color: var(--text-medium); line-height: 1.7; margin-bottom: 20px; font-size: 0.95rem; }
 .testimonial-author { display: flex; align-items: center; gap: 12px; }
@@ -516,6 +521,66 @@ nav.scrolled {
 }
 .testimonial-name { font-weight: 600; font-size: 0.95rem; }
 .testimonial-rating { color: #f39c12; font-size: 0.85rem; }
+
+/* Review Form */
+.review-form-wrapper {
+    margin-top: 60px;
+    display: flex;
+    justify-content: center;
+}
+.review-form-card {
+    background: var(--white);
+    padding: 40px;
+    border-radius: 24px;
+    box-shadow: var(--shadow);
+    width: 100%;
+    max-width: 650px;
+    border: 1px solid rgba(139, 69, 19, 0.08);
+}
+.review-form-card h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.8rem;
+    color: var(--text-dark);
+    margin-bottom: 8px;
+    text-align: center;
+}
+.review-form-card p {
+    color: var(--text-light);
+    text-align: center;
+    margin-bottom: 24px;
+    font-size: 0.95rem;
+}
+.star-rating {
+    display: flex;
+    gap: 8px;
+    padding: 4px 0;
+}
+.star-btn {
+    background: none;
+    border: none;
+    font-size: 1.8rem;
+    color: var(--gold-light);
+    cursor: pointer;
+    transition: var(--transition);
+    padding: 0;
+}
+.star-btn.active, .star-btn:hover {
+    color: #f39c12;
+    transform: scale(1.15);
+}
+.review-success-message {
+    background: rgba(37, 211, 102, 0.1);
+    color: #1da851;
+    padding: 14px 20px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-left: 4px solid #25D366;
+    animation: fadeInUp 0.4s ease-out;
+}
 
 /* Contact Section */
 .contact-section { background: var(--cream); }

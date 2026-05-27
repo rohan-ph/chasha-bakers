@@ -1,43 +1,162 @@
 "use client";
 
 import Link from "next/link";
+import { useState, useEffect } from "react";
+
+const DEFAULT_REVIEWS = [
+  { name: "Anitha R.", initial: "A", text: "The chocolate truffle cake was absolutely divine! Best bakery in town. Every order has been consistent in quality. Highly recommend CHASHA BAKERS!", rating: 5 },
+  { name: "Priya S.", initial: "P", text: "Ordered a custom birthday cake for my daughter and it was stunning! The taste was even better than expected. Thank you for making her day special!", rating: 5 },
+  { name: "Rohan K.", initial: "R", text: "Fresh, delicious, and beautifully packaged. The cookies are addictive! I've been ordering weekly for my family. Great service via WhatsApp too!", rating: 5 },
+];
 
 export function Testimonials() {
-  const reviews = [
-    { name: "Anitha R.", initial: "A", text: "The chocolate truffle cake was absolutely divine! Best bakery in town. Every order has been consistent in quality. Highly recommend CHASHA BAKERS!" },
-    { name: "Priya S.", initial: "P", text: "Ordered a custom birthday cake for my daughter and it was stunning! The taste was even better than expected. Thank you for making her day special!" },
-    { name: "Rohan K.", initial: "R", text: "Fresh, delicious, and beautifully packaged. The cookies are addictive! I've been ordering weekly for my family. Great service via WhatsApp too!" },
-  ];
+  const [reviews, setReviews] = useState<Array<{ name: string; initial: string; text: string; rating: number }>>([]);
+  const [name, setName] = useState("");
+  const [text, setText] = useState("");
+  const [rating, setRating] = useState(5);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("chasha_reviews");
+    if (saved) {
+      try {
+        setReviews(JSON.parse(saved));
+      } catch (e) {
+        setReviews(DEFAULT_REVIEWS);
+      }
+    } else {
+      setReviews(DEFAULT_REVIEWS);
+    }
+  }, []);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !text.trim()) return;
+
+    const initial = name.trim().charAt(0).toUpperCase() || "C";
+    const newReview = {
+      name: name.trim(),
+      initial,
+      text: text.trim(),
+      rating
+    };
+
+    const updatedReviews = [newReview, ...reviews];
+    setReviews(updatedReviews);
+    localStorage.setItem("chasha_reviews", JSON.stringify(updatedReviews));
+
+    setName("");
+    setText("");
+    setRating(5);
+    setIsSubmitted(true);
+
+    setTimeout(() => {
+      setIsSubmitted(false);
+    }, 4000);
+  };
 
   return (
     <section className="section testimonials-section" id="testimonials">
       <div className="container">
         <div className="section-header">
-          <div className="section-badge"><i className="fas fa-quote-left"></i> Customer Love</div>
+          <div className="section-badge"><i className="fas fa-quote-left"></i> Reviews From Our Customers</div>
           <h2 className="section-title">What Our <span>Customers Say</span></h2>
           <p className="section-desc">Don't just take our word for it — hear from our happy customers!</p>
         </div>
         <div className="testimonial-grid">
           {reviews.map((r, i) => (
             <div key={i} className="testimonial-card fade-in visible">
-              <div className="testimonial-quote">"</div>
+              <div className="testimonial-quote"><i className="fas fa-quote-right"></i></div>
               <p className="testimonial-text">{r.text}</p>
               <div className="testimonial-author">
                 <div className="testimonial-avatar">{r.initial}</div>
                 <div>
                   <div className="testimonial-name">{r.name}</div>
-                  <div className="testimonial-rating">⭐⭐⭐⭐⭐</div>
+                  <div className="testimonial-rating">
+                    {Array.from({ length: 5 }).map((_, idx) => (
+                      <i
+                        key={idx}
+                        className={idx < r.rating ? "fas fa-star" : "far fa-star"}
+                        style={{ color: "#f39c12", marginRight: "2px" }}
+                      />
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
           ))}
+        </div>
+
+        {/* Add Review Form */}
+        <div className="review-form-wrapper">
+          <div className="review-form-card">
+            <h3>Share Your Experience</h3>
+            <p>Tell us what you loved about CHASHA BAKERS!</p>
+            
+            {isSubmitted && (
+              <div className="review-success-message">
+                <i className="fas fa-check-circle"></i>
+                Thank you! Your review has been added successfully.
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit}>
+              <div className="form-group">
+                <label>Your Rating</label>
+                <div className="star-rating">
+                  {Array.from({ length: 5 }).map((_, idx) => {
+                    const starValue = idx + 1;
+                    return (
+                      <button
+                        type="button"
+                        key={idx}
+                        className={`star-btn ${(hoverRating || rating) >= starValue ? "active" : ""}`}
+                        onClick={() => setRating(starValue)}
+                        onMouseEnter={() => setHoverRating(starValue)}
+                        onMouseLeave={() => setHoverRating(0)}
+                      >
+                        <i className={(hoverRating || rating) >= starValue ? "fas fa-star" : "far fa-star"}></i>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group" style={{ width: "100%" }}>
+                  <label>Your Name</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Enter your name"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Review Description</label>
+                <textarea
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  placeholder="Share details of your experience..."
+                  required
+                ></textarea>
+              </div>
+
+              <button type="submit" className="form-submit">
+                <i className="fas fa-paper-plane"></i> Submit Review
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </section>
   );
 }
 
-import { useState } from "react";
 
 export function Contact() {
   const [formData, setFormData] = useState({
