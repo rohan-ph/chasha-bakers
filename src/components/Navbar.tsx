@@ -59,14 +59,8 @@ export default function Navbar() {
                 </div>
               ) : (
                 <button
-                  className="nav-cta"
+                  className="nav-login-btn"
                   onClick={() => setShowLoginModal(true)}
-                  style={{
-                    background: "transparent",
-                    color: "var(--primary)",
-                    border: "2px solid var(--primary)",
-                    marginLeft: "10px"
-                  }}
                 >
                   Login
                 </button>

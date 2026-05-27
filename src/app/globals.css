@@ -134,6 +134,28 @@ nav.scrolled {
 }
 .nav-cta::after { display: none !important; }
 .nav-cta:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+
+.nav-login-btn {
+    background: transparent;
+    color: var(--primary) !important;
+    border: 2px solid var(--primary);
+    padding: 8px 24px;
+    border-radius: 50px;
+    font-weight: 600 !important;
+    margin-left: 10px;
+    transition: var(--transition);
+    cursor: pointer;
+    font-family: 'Poppins', sans-serif;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.nav-login-btn:hover {
+    background: var(--primary);
+    color: white !important;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+}
 .hamburger {
     display: none; flex-direction: column; gap: 5px;
     cursor: pointer; padding: 5px; background: none; border: none;
