@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 
+export const dynamic = 'force-dynamic';
+
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const REPO = 'rohan-ph/chasha-bakers';
 const FILE_PATH = 'src/data/reviews.json';
