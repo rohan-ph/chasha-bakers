@@ -18,19 +18,35 @@ export function Testimonials() {
   const [isSubmitted, setIsSubmitted] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem("chasha_reviews");
-    if (saved) {
-      try {
-        setReviews(JSON.parse(saved));
-      } catch (e) {
-        setReviews(DEFAULT_REVIEWS);
-      }
-    } else {
-      setReviews(DEFAULT_REVIEWS);
-    }
+    // Fetch reviews from API route on load
+    fetch("/api/reviews")
+      .then((res) => {
+        if (!res.ok) throw new Error("API error");
+        return res.json();
+      })
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setReviews(data);
+        } else {
+          setReviews(DEFAULT_REVIEWS);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load reviews from API, falling back to localStorage/defaults:", err);
+        const saved = localStorage.getItem("chasha_reviews");
+        if (saved) {
+          try {
+            setReviews(JSON.parse(saved));
+          } catch (e) {
+            setReviews(DEFAULT_REVIEWS);
+          }
+        } else {
+          setReviews(DEFAULT_REVIEWS);
+        }
+      });
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !text.trim()) return;
 
@@ -42,10 +58,10 @@ export function Testimonials() {
       rating
     };
 
-    const updatedReviews = [newReview, ...reviews];
-    setReviews(updatedReviews);
-    localStorage.setItem("chasha_reviews", JSON.stringify(updatedReviews));
+    // Optimistically update UI immediately for high-performance feel
+    setReviews((prev) => [newReview, ...prev]);
 
+    // Reset input fields
     setName("");
     setText("");
     setRating(5);
@@ -54,6 +70,33 @@ export function Testimonials() {
     setTimeout(() => {
       setIsSubmitted(false);
     }, 4000);
+
+    // Save permanently to database (via GitHub API route)
+    try {
+      const response = await fetch("/api/reviews", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(newReview),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to save review");
+      }
+
+      // Re-fetch latest list to ensure UI matches the server state exactly
+      const res = await fetch("/api/reviews");
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setReviews(data);
+      }
+    } catch (err) {
+      console.error("Failed to save review permanently:", err);
+      // Fallback: Save to localStorage as a backup
+      const updatedReviews = [newReview, ...reviews];
+      localStorage.setItem("chasha_reviews", JSON.stringify(updatedReviews));
+    }
   };
 
   return (
