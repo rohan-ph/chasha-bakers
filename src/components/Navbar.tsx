@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useAuth } from "../context/AuthContext";
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { user, setShowLoginModal, logout, isInitialized } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -45,6 +47,32 @@ export default function Navbar() {
               Order Now
             </Link>
           </li>
+          {isInitialized && (
+            <li>
+              {user ? (
+                <div className="nav-user-profile">
+                  <div className="nav-user-avatar">{user.initial}</div>
+                  <span className="nav-user-name">{user.name}</span>
+                  <button className="nav-user-logout-btn" onClick={logout} title="Logout">
+                    <i className="fas fa-sign-out-alt"></i>
+                  </button>
+                </div>
+              ) : (
+                <button
+                  className="nav-cta"
+                  onClick={() => setShowLoginModal(true)}
+                  style={{
+                    background: "transparent",
+                    color: "var(--primary)",
+                    border: "2px solid var(--primary)",
+                    marginLeft: "10px"
+                  }}
+                >
+                  Login
+                </button>
+              )}
+            </li>
+          )}
         </ul>
         <button
           className={`hamburger ${mobileMenuOpen ? "active" : ""}`}
@@ -78,7 +106,39 @@ export default function Navbar() {
         >
           Order Now
         </Link>
-
+        {isInitialized && (
+          <div style={{ marginTop: "15px", paddingTop: "15px", borderTop: "1px solid var(--cream-dark)" }}>
+            {user ? (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <div className="nav-user-avatar">{user.initial}</div>
+                  <span className="nav-user-name" style={{ fontWeight: 600 }}>{user.name}</span>
+                </div>
+                <button
+                  className="nav-user-logout-btn"
+                  onClick={() => {
+                    logout();
+                    setMobileMenuOpen(false);
+                  }}
+                  style={{ fontSize: "1rem", display: "flex", alignItems: "center", gap: "6px" }}
+                >
+                  <i className="fas fa-sign-out-alt"></i> Logout
+                </button>
+              </div>
+            ) : (
+              <button
+                className="nav-cta"
+                onClick={() => {
+                  setShowLoginModal(true);
+                  setMobileMenuOpen(false);
+                }}
+                style={{ width: "100%", textAlign: "center" }}
+              >
+                Login
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </nav>
   );

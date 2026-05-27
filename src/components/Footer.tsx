@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { fetchReviewsFromGitHub, submitReviewToGitHub } from "../lib/githubDb";
+import { useAuth } from "../context/AuthContext";
 
 const DEFAULT_REVIEWS = [
   { name: "Anitha R.", initial: "A", text: "The chocolate truffle cake was absolutely divine! Best bakery in town. Every order has been consistent in quality. Highly recommend CHASHA BAKERS!", rating: 5 },
@@ -11,12 +12,23 @@ const DEFAULT_REVIEWS = [
 ];
 
 export function Testimonials() {
+  const { user, setShowLoginModal, isInitialized } = useAuth();
+
   const [reviews, setReviews] = useState<Array<{ name: string; initial: string; text: string; rating: number }>>([]);
   const [name, setName] = useState("");
   const [text, setText] = useState("");
   const [rating, setRating] = useState(5);
   const [hoverRating, setHoverRating] = useState(0);
   const [isSubmitted, setIsSubmitted] = useState(false);
+
+  // Sync author name with logged-in user details
+  useEffect(() => {
+    if (user) {
+      setName(user.name);
+    } else {
+      setName("");
+    }
+  }, [user]);
 
   useEffect(() => {
     // Fetch reviews directly from GitHub Contents API (client-side database bypasses serverless)
@@ -161,55 +173,73 @@ export function Testimonials() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label>Your Rating</label>
-                <div className="star-rating">
-                  {Array.from({ length: 5 }).map((_, idx) => {
-                    const starValue = idx + 1;
-                    return (
-                      <button
-                        type="button"
-                        key={idx}
-                        className={`star-btn ${(hoverRating || rating) >= starValue ? "active" : ""}`}
-                        onClick={() => setRating(starValue)}
-                        onMouseEnter={() => setHoverRating(starValue)}
-                        onMouseLeave={() => setHoverRating(0)}
-                      >
-                        <i className={(hoverRating || rating) >= starValue ? "fas fa-star" : "far fa-star"}></i>
-                      </button>
-                    );
-                  })}
-                </div>
+            {!isInitialized ? (
+              <div style={{ display: "flex", justifyContent: "center", padding: "20px" }}>
+                <div className="login-spinner" style={{ borderTopColor: "var(--primary)", width: "32px", height: "32px" }}></div>
               </div>
+            ) : user ? (
+              <form onSubmit={handleSubmit}>
+                <div className="form-group">
+                  <label>Your Rating</label>
+                  <div className="star-rating">
+                    {Array.from({ length: 5 }).map((_, idx) => {
+                      const starValue = idx + 1;
+                      return (
+                        <button
+                          type="button"
+                          key={idx}
+                          className={`star-btn ${(hoverRating || rating) >= starValue ? "active" : ""}`}
+                          onClick={() => setRating(starValue)}
+                          onMouseEnter={() => setHoverRating(starValue)}
+                          onMouseLeave={() => setHoverRating(0)}
+                        >
+                          <i className={(hoverRating || rating) >= starValue ? "fas fa-star" : "far fa-star"}></i>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
-              <div className="form-row">
-                <div className="form-group" style={{ width: "100%" }}>
-                  <label>Your Name</label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Enter your name"
+                <div className="form-row">
+                  <div className="form-group" style={{ width: "100%" }}>
+                    <label>Your Name</label>
+                    <input
+                      type="text"
+                      value={name}
+                      readOnly
+                      style={{ background: "var(--cream-dark)", cursor: "not-allowed" }}
+                      placeholder="Enter your name"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Review Description</label>
+                  <textarea
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    placeholder="Share details of your experience..."
                     required
-                  />
+                  ></textarea>
                 </div>
-              </div>
 
-              <div className="form-group">
-                <label>Review Description</label>
-                <textarea
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  placeholder="Share details of your experience..."
-                  required
-                ></textarea>
+                <button type="submit" className="form-submit">
+                  <i className="fas fa-paper-plane"></i> Submit Review
+                </button>
+              </form>
+            ) : (
+              <div className="review-login-required">
+                <p>Verify your mobile number via OTP to submit a public review.</p>
+                <button
+                  type="button"
+                  className="review-login-btn"
+                  onClick={() => setShowLoginModal(true)}
+                >
+                  <i className="fas fa-mobile-alt"></i> Login via Mobile & OTP
+                </button>
               </div>
-
-              <button type="submit" className="form-submit">
-                <i className="fas fa-paper-plane"></i> Submit Review
-              </button>
-            </form>
+            )}
           </div>
         </div>
       </div>
