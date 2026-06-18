@@ -84,7 +84,7 @@ export default function Menu({ onOrder }: { onOrder: (product: any) => void }) {
                           >
                             <i className="fas fa-cart-plus"></i> Add
                           </button>
-                          <button className="btn-order" onClick={() => addToCart(p, 1)}>
+                          <button className="btn-order" onClick={() => onOrder(p)}>
                             Order
                           </button>
                         </>

@@ -9,8 +9,18 @@ import Menu from "@/components/Menu";
 import { Testimonials, Contact, Footer } from "@/components/Footer";
 import { CartProvider } from "../context/CartContext";
 import CartDrawer from "../components/CartDrawer";
+import OrderModal from "@/components/OrderModal";
+import { localProducts } from "@/lib/db";
 
 export default function Home() {
+  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
+
+  const handleOrderClick = (product: any) => {
+    setSelectedProduct(product);
+    setIsOrderModalOpen(true);
+  };
+
   return (
     <CartProvider>
       <main>
@@ -18,12 +28,19 @@ export default function Home() {
         <Hero />
         <About />
         <Specialties />
-        <Menu onOrder={() => {}} />
+        <Menu onOrder={handleOrderClick} />
         <Testimonials />
         <Contact />
         <Footer />
 
         <CartDrawer />
+
+        <OrderModal
+          isOpen={isOrderModalOpen}
+          onClose={() => setIsOrderModalOpen(false)}
+          selectedProduct={selectedProduct}
+          products={localProducts}
+        />
 
         <a
           href="https://wa.me/918296339002"
