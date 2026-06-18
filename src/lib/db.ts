@@ -250,18 +250,22 @@ export async function addProduct(product: Omit<DbProduct, "id"> & { id?: number 
     available: product.available !== false
   };
 
+  localProducts.push(fullProduct);
+  saveLocalProducts();
+
   if (useFirestore && db) {
-    await setDoc(doc(db, "products", nextId.toString()), fullProduct);
-  } else {
-    localProducts.push(fullProduct);
-    saveLocalProducts();
+    setDoc(doc(db, "products", nextId.toString()), fullProduct)
+      .catch((err) => console.warn("Background addProduct to Firestore failed:", err));
   }
   return fullProduct;
 }
 
 export async function updateProduct(product: DbProduct): Promise<void> {
+  localProducts = localProducts.map(p => p.id === product.id ? product : p);
+  saveLocalProducts();
+
   if (useFirestore && db) {
-    await updateDoc(doc(db, "products", product.id.toString()), {
+    updateDoc(doc(db, "products", product.id.toString()), {
       name: product.name,
       category: product.category,
       price: product.price,
@@ -269,19 +273,17 @@ export async function updateProduct(product: DbProduct): Promise<void> {
       image: product.image,
       badge: product.badge || "",
       available: product.available
-    });
-  } else {
-    localProducts = localProducts.map(p => p.id === product.id ? product : p);
-    saveLocalProducts();
+    }).catch((err) => console.warn("Background updateProduct to Firestore failed:", err));
   }
 }
 
 export async function deleteProduct(productId: number): Promise<void> {
+  localProducts = localProducts.filter(p => p.id !== productId);
+  saveLocalProducts();
+
   if (useFirestore && db) {
-    await deleteDoc(doc(db, "products", productId.toString()));
-  } else {
-    localProducts = localProducts.filter(p => p.id !== productId);
-    saveLocalProducts();
+    deleteDoc(doc(db, "products", productId.toString()))
+      .catch((err) => console.warn("Background deleteProduct to Firestore failed:", err));
   }
 }
 
@@ -350,20 +352,22 @@ export async function submitReview(review: Omit<DbReview, "status" | "timestamp"
 }
 
 export async function updateReviewStatus(reviewId: string, status: "approved" | "rejected"): Promise<void> {
+  localReviews = localReviews.map(r => r.id === reviewId ? { ...r, status } : r);
+  saveLocalReviews();
+
   if (useFirestore && db) {
-    await updateDoc(doc(db, "reviews", reviewId), { status });
-  } else {
-    localReviews = localReviews.map(r => r.id === reviewId ? { ...r, status } : r);
-    saveLocalReviews();
+    updateDoc(doc(db, "reviews", reviewId), { status })
+      .catch((err) => console.warn("Background updateReviewStatus to Firestore failed:", err));
   }
 }
 
 export async function deleteReview(reviewId: string): Promise<void> {
+  localReviews = localReviews.filter(r => r.id !== reviewId);
+  saveLocalReviews();
+
   if (useFirestore && db) {
-    await deleteDoc(doc(db, "reviews", reviewId));
-  } else {
-    localReviews = localReviews.filter(r => r.id !== reviewId);
-    saveLocalReviews();
+    deleteDoc(doc(db, "reviews", reviewId))
+      .catch((err) => console.warn("Background deleteReview to Firestore failed:", err));
   }
 }
 
@@ -409,32 +413,44 @@ export async function saveOrder(order: Omit<DbOrder, "id" | "status" | "timestam
     timestamp: new Date()
   };
 
+  localOrders = [newOrder, ...localOrders];
+  saveLocalOrders();
+
   if (useFirestore && db) {
-    await setDoc(doc(db, "orders", orderId), {
+    setDoc(doc(db, "orders", orderId), {
       ...newOrder,
       timestamp: Timestamp.fromDate(newOrder.timestamp)
-    });
-  } else {
-    localOrders = [newOrder, ...localOrders];
-    saveLocalOrders();
+    }).catch((err) => console.warn("Background saveOrder to Firestore failed:", err));
   }
   return newOrder;
 }
 
 export async function updateOrderStatus(orderId: string, status: DbOrder["status"]): Promise<void> {
+  localOrders = localOrders.map(o => o.id === orderId ? { ...o, status } : o);
+  saveLocalOrders();
+
   if (useFirestore && db) {
-    await updateDoc(doc(db, "orders", orderId), { status });
-  } else {
-    localOrders = localOrders.map(o => o.id === orderId ? { ...o, status } : o);
-    saveLocalOrders();
+    updateDoc(doc(db, "orders", orderId), { status })
+      .catch((err) => console.warn("Background updateOrderStatus to Firestore failed:", err));
   }
 }
 
 // --- REAL-TIME LISTENERS ---
 
 export function subscribeToProducts(callback: (products: DbProduct[]) => void) {
+  let hasReceivedSnapshot = false;
+
+  const timeoutId = setTimeout(() => {
+    if (!hasReceivedSnapshot) {
+      console.warn("Firestore products snapshot listener timed out, falling back to local storage");
+      callback(localProducts);
+    }
+  }, 1500);
+
   if (useFirestore && db) {
-    return onSnapshot(query(collection(db, "products")), (snap) => {
+    const unsub = onSnapshot(query(collection(db, "products")), (snap) => {
+      hasReceivedSnapshot = true;
+      clearTimeout(timeoutId);
       const list: DbProduct[] = [];
       snap.forEach((docSnap) => {
         const data = docSnap.data();
@@ -451,12 +467,31 @@ export function subscribeToProducts(callback: (products: DbProduct[]) => void) {
       });
       callback(mergeDbWithStaticProducts(list));
     }, (err) => {
+      hasReceivedSnapshot = true;
+      clearTimeout(timeoutId);
       console.error("Error in products snapshot subscriber:", err);
       callback(localProducts);
     });
+
+    if (typeof window !== "undefined") {
+      const handleStorage = (e: StorageEvent) => {
+        if (e.key === LOCAL_STORAGE_KEYS.products) {
+          localProducts = getStoredProducts();
+          if (!hasReceivedSnapshot) {
+            callback(localProducts);
+          }
+        }
+      };
+      window.addEventListener("storage", handleStorage);
+      return () => {
+        unsub();
+        window.removeEventListener("storage", handleStorage);
+      };
+    }
+    return unsub;
   }
   
-  // Non-firestore fallback trigger (instant return + react on tab updates)
+  clearTimeout(timeoutId);
   callback(localProducts);
   if (typeof window !== "undefined") {
     const handleStorage = (e: StorageEvent) => {
@@ -472,9 +507,20 @@ export function subscribeToProducts(callback: (products: DbProduct[]) => void) {
 }
 
 export function subscribeToApprovedReviews(callback: (reviews: DbReview[]) => void) {
+  let hasReceivedSnapshot = false;
+
+  const timeoutId = setTimeout(() => {
+    if (!hasReceivedSnapshot) {
+      console.warn("Firestore approved reviews snapshot listener timed out, falling back to local storage");
+      callback(localReviews.filter(r => r.status === "approved"));
+    }
+  }, 1500);
+
   if (useFirestore && db) {
     const q = query(collection(db, "reviews"), where("status", "==", "approved"), orderBy("timestamp", "desc"));
-    return onSnapshot(q, (snap) => {
+    const unsub = onSnapshot(q, (snap) => {
+      hasReceivedSnapshot = true;
+      clearTimeout(timeoutId);
       const list: DbReview[] = [];
       snap.forEach((docSnap) => {
         const data = docSnap.data();
@@ -490,10 +536,31 @@ export function subscribeToApprovedReviews(callback: (reviews: DbReview[]) => vo
       });
       callback(list);
     }, (err) => {
+      hasReceivedSnapshot = true;
+      clearTimeout(timeoutId);
       console.error("Error in reviews snapshot subscriber:", err);
       callback(localReviews.filter(r => r.status === "approved"));
     });
+
+    if (typeof window !== "undefined") {
+      const handleStorage = (e: StorageEvent) => {
+        if (e.key === LOCAL_STORAGE_KEYS.reviews) {
+          localReviews = getStoredReviews();
+          if (!hasReceivedSnapshot) {
+            callback(localReviews.filter(r => r.status === "approved"));
+          }
+        }
+      };
+      window.addEventListener("storage", handleStorage);
+      return () => {
+        unsub();
+        window.removeEventListener("storage", handleStorage);
+      };
+    }
+    return unsub;
   }
+
+  clearTimeout(timeoutId);
   callback(localReviews.filter(r => r.status === "approved"));
   if (typeof window !== "undefined") {
     const handleStorage = (e: StorageEvent) => {
@@ -509,9 +576,20 @@ export function subscribeToApprovedReviews(callback: (reviews: DbReview[]) => vo
 }
 
 export function subscribeToAllReviews(callback: (reviews: DbReview[]) => void) {
+  let hasReceivedSnapshot = false;
+
+  const timeoutId = setTimeout(() => {
+    if (!hasReceivedSnapshot) {
+      console.warn("Firestore reviews snapshot listener timed out, falling back to local storage");
+      callback(localReviews);
+    }
+  }, 1500);
+
   if (useFirestore && db) {
     const q = query(collection(db, "reviews"), orderBy("timestamp", "desc"));
-    return onSnapshot(q, (snap) => {
+    const unsub = onSnapshot(q, (snap) => {
+      hasReceivedSnapshot = true;
+      clearTimeout(timeoutId);
       const list: DbReview[] = [];
       snap.forEach((docSnap) => {
         const data = docSnap.data();
@@ -527,10 +605,31 @@ export function subscribeToAllReviews(callback: (reviews: DbReview[]) => void) {
       });
       callback(list);
     }, (err) => {
+      hasReceivedSnapshot = true;
+      clearTimeout(timeoutId);
       console.error("Error in admin reviews snapshot subscriber:", err);
       callback(localReviews);
     });
+
+    if (typeof window !== "undefined") {
+      const handleStorage = (e: StorageEvent) => {
+        if (e.key === LOCAL_STORAGE_KEYS.reviews) {
+          localReviews = getStoredReviews();
+          if (!hasReceivedSnapshot) {
+            callback(localReviews);
+          }
+        }
+      };
+      window.addEventListener("storage", handleStorage);
+      return () => {
+        unsub();
+        window.removeEventListener("storage", handleStorage);
+      };
+    }
+    return unsub;
   }
+
+  clearTimeout(timeoutId);
   callback(localReviews);
   if (typeof window !== "undefined") {
     const handleStorage = (e: StorageEvent) => {
@@ -546,9 +645,20 @@ export function subscribeToAllReviews(callback: (reviews: DbReview[]) => void) {
 }
 
 export function subscribeToOrders(callback: (orders: DbOrder[]) => void) {
+  let hasReceivedSnapshot = false;
+
+  const timeoutId = setTimeout(() => {
+    if (!hasReceivedSnapshot) {
+      console.warn("Firestore orders snapshot listener timed out, falling back to local storage");
+      callback(localOrders);
+    }
+  }, 1500);
+
   if (useFirestore && db) {
     const q = query(collection(db, "orders"), orderBy("timestamp", "desc"));
-    return onSnapshot(q, (snap) => {
+    const unsub = onSnapshot(q, (snap) => {
+      hasReceivedSnapshot = true;
+      clearTimeout(timeoutId);
       const list: DbOrder[] = [];
       snap.forEach((docSnap) => {
         const data = docSnap.data();
@@ -566,10 +676,31 @@ export function subscribeToOrders(callback: (orders: DbOrder[]) => void) {
       });
       callback(list);
     }, (err) => {
+      hasReceivedSnapshot = true;
+      clearTimeout(timeoutId);
       console.error("Error in admin orders snapshot subscriber:", err);
       callback(localOrders);
     });
+
+    if (typeof window !== "undefined") {
+      const handleStorage = (e: StorageEvent) => {
+        if (e.key === LOCAL_STORAGE_KEYS.orders) {
+          localOrders = getStoredOrders();
+          if (!hasReceivedSnapshot) {
+            callback(localOrders);
+          }
+        }
+      };
+      window.addEventListener("storage", handleStorage);
+      return () => {
+        unsub();
+        window.removeEventListener("storage", handleStorage);
+      };
+    }
+    return unsub;
   }
+
+  clearTimeout(timeoutId);
   callback(localOrders);
   if (typeof window !== "undefined") {
     const handleStorage = (e: StorageEvent) => {
