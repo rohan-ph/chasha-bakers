@@ -255,11 +255,22 @@ export async function submitReview(review: Omit<DbReview, "status" | "timestamp"
   };
 
   if (useFirestore && db) {
-    const docRef = await addDoc(collection(db, "reviews"), {
-      ...newReview,
-      timestamp: Timestamp.fromDate(newReview.timestamp)
-    });
-    newReview.id = docRef.id;
+    try {
+      const docRef = await Promise.race([
+        addDoc(collection(db, "reviews"), {
+          ...newReview,
+          timestamp: Timestamp.fromDate(newReview.timestamp)
+        }),
+        new Promise<any>((_, reject) =>
+          setTimeout(() => reject(new Error("Database write timeout")), 1500)
+        )
+      ]);
+      newReview.id = docRef.id;
+    } catch (err) {
+      console.error("Failed to submit review to Firestore, falling back to local memory:", err);
+      newReview.id = Math.random().toString(36).substr(2, 9);
+      localReviews = [newReview, ...localReviews];
+    }
   } else {
     newReview.id = Math.random().toString(36).substr(2, 9);
     localReviews = [newReview, ...localReviews];
@@ -395,6 +406,7 @@ export function subscribeToApprovedReviews(callback: (reviews: DbReview[]) => vo
       callback(list);
     }, (err) => {
       console.error("Error in reviews snapshot subscriber:", err);
+      callback(localReviews.filter(r => r.status === "approved"));
     });
   }
   callback(localReviews.filter(r => r.status === "approved"));
@@ -421,6 +433,7 @@ export function subscribeToAllReviews(callback: (reviews: DbReview[]) => void) {
       callback(list);
     }, (err) => {
       console.error("Error in admin reviews snapshot subscriber:", err);
+      callback(localReviews);
     });
   }
   callback(localReviews);
