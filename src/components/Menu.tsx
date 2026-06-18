@@ -1,15 +1,28 @@
 "use client";
 
-import { useState } from "react";
-import { PRODUCTS, Product } from "@/data/products";
+import { useState, useEffect } from "react";
+import { useCart } from "../context/CartContext";
+import { subscribeToProducts, DbProduct } from "../lib/db";
 
-export default function Menu({ onOrder }: { onOrder: (product: Product) => void }) {
+export default function Menu({ onOrder }: { onOrder: (product: any) => void }) {
   const [filter, setFilter] = useState("all");
+  const [products, setProducts] = useState<DbProduct[]>([]);
+  const { addToCart } = useCart();
+
+  useEffect(() => {
+    // Subscribe to real-time products
+    const unsubscribe = subscribeToProducts((list) => {
+      setProducts(list);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Get unique categories from active products
   const categories = ["all", "cupcakes", "donuts", "filled donuts", "muffins", "teacakes", "brownies", "custom cakes"];
 
   const filteredProducts = filter === "all" 
-    ? PRODUCTS 
-    : PRODUCTS.filter(p => p.category === filter);
+    ? products 
+    : products.filter(p => p.category === filter);
 
   return (
     <section className="section menu-section" id="menu">
@@ -40,39 +53,52 @@ export default function Menu({ onOrder }: { onOrder: (product: Product) => void 
           ))}
         </div>
         <div className="menu-grid">
-          {filteredProducts.map((p) => (
-            <div key={p.id} className="product-card fade-in visible">
-              <div className="product-img">
-                <img src={p.image} alt={p.name} loading="lazy" />
-                {p.badge && <span className="product-badge">{p.badge}</span>}
-                <button className="product-fav">
-                  <i className="fas fa-heart"></i>
-                </button>
-              </div>
-              <div className="product-info">
-                <div className="product-category">{p.category}</div>
-                <h3 className="product-name">{p.name}</h3>
-                <p className="product-desc">{p.desc}</p>
-                <div className="product-bottom">
-                  <div className="product-price">
-                    {p.price === 0 ? "Price depends" : `₹${p.price}`}
-                  </div>
-                  <div className="product-actions">
-                    <button 
-                        className="btn-whatsapp" 
-                        title="Order on WhatsApp"
-                        onClick={() => window.open(`https://wa.me/918296339002?text=Hi! I want to order ${p.name}`, '_blank')}
-                    >
-                      <i className="fab fa-whatsapp"></i>
-                    </button>
-                    <button className="btn-order" onClick={() => onOrder(p)}>
-                      Order
-                    </button>
+          {filteredProducts.map((p) => {
+            const isAvailable = p.available !== false;
+            return (
+              <div key={p.id} className={`product-card fade-in visible ${!isAvailable ? "sold-out" : ""}`}>
+                <div className="product-img">
+                  <img src={p.image} alt={p.name} loading="lazy" />
+                  {!isAvailable && <span className="product-badge" style={{ background: "#7f8c8d" }}>Sold Out</span>}
+                  {isAvailable && p.badge && <span className="product-badge">{p.badge}</span>}
+                  <button className="product-fav">
+                    <i className="fas fa-heart"></i>
+                  </button>
+                </div>
+                <div className="product-info">
+                  <div className="product-category">{p.category}</div>
+                  <h3 className="product-name">{p.name}</h3>
+                  <p className="product-desc">{p.desc}</p>
+                  <div className="product-bottom">
+                    <div className="product-price">
+                      {p.price === 0 ? "Price depends" : `₹${p.price}`}
+                    </div>
+                    <div className="product-actions">
+                      {isAvailable ? (
+                        <>
+                          <button 
+                            className="btn-whatsapp" 
+                            title="Add to Cart"
+                            onClick={() => addToCart(p, 1)}
+                            style={{ background: "var(--primary-light)" }}
+                          >
+                            <i className="fas fa-cart-plus"></i> Add
+                          </button>
+                          <button className="btn-order" onClick={() => addToCart(p, 1)}>
+                            Order
+                          </button>
+                        </>
+                      ) : (
+                        <button className="btn-order" disabled style={{ background: "#bdc3c7", cursor: "not-allowed" }}>
+                          Unavailable
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </section>

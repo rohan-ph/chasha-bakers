@@ -7,40 +7,23 @@ import About from "@/components/About";
 import Specialties from "@/components/Specialties";
 import Menu from "@/components/Menu";
 import { Testimonials, Contact, Footer } from "@/components/Footer";
-import OrderModal from "@/components/OrderModal";
-import { PRODUCTS, Product } from "@/data/products";
-import { AuthProvider } from "../context/AuthContext";
-import LoginModal from "../components/LoginModal";
+import { CartProvider } from "../context/CartContext";
+import CartDrawer from "../components/CartDrawer";
 
 export default function Home() {
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  const handleOrder = (product: Product) => {
-    setSelectedProduct(product);
-    setIsModalOpen(true);
-  };
-
   return (
-    <AuthProvider>
+    <CartProvider>
       <main>
         <Navbar />
         <Hero />
         <About />
         <Specialties />
-        <Menu onOrder={handleOrder} />
+        <Menu onOrder={() => {}} />
         <Testimonials />
         <Contact />
         <Footer />
 
-        <OrderModal
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          selectedProduct={selectedProduct}
-          products={PRODUCTS}
-        />
-
-        <LoginModal />
+        <CartDrawer />
 
         <a
           href="https://wa.me/918296339002"
@@ -51,6 +34,6 @@ export default function Home() {
           <i className="fab fa-whatsapp"></i>
         </a>
       </main>
-    </AuthProvider>
+    </CartProvider>
   );
 }

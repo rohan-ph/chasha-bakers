@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { fetchReviewsFromGitHub, submitReviewToGitHub } from "../lib/githubDb";
-import { useAuth } from "../context/AuthContext";
+import { subscribeToApprovedReviews, submitReview } from "../lib/db";
 
 const DEFAULT_REVIEWS = [
   { name: "Anitha R.", initial: "A", text: "The chocolate truffle cake was absolutely divine! Best bakery in town. Every order has been consistent in quality. Highly recommend CHASHA BAKERS!", rating: 5 },
@@ -12,119 +11,48 @@ const DEFAULT_REVIEWS = [
 ];
 
 export function Testimonials() {
-  const { user, setShowLoginModal, isInitialized } = useAuth();
-
   const [reviews, setReviews] = useState<Array<{ name: string; initial: string; text: string; rating: number }>>([]);
   const [name, setName] = useState("");
   const [text, setText] = useState("");
   const [rating, setRating] = useState(5);
   const [hoverRating, setHoverRating] = useState(0);
   const [isSubmitted, setIsSubmitted] = useState(false);
-
-  // Sync author name with logged-in user details
-  useEffect(() => {
-    if (user) {
-      setName(user.name);
-    } else {
-      setName("");
-    }
-  }, [user]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    // Fetch reviews directly from GitHub Contents API (client-side database bypasses serverless)
-    fetchReviewsFromGitHub()
-      .then((res) => {
-        if (Array.isArray(res.reviews)) {
-          setReviews(res.reviews);
-        } else {
-          setReviews(DEFAULT_REVIEWS);
-        }
-      })
-      .catch((err) => {
-        console.warn("Client-side direct GitHub load failed, trying /api/reviews fallback:", err);
-        // Fallback: Try local API endpoint
-        fetch("/api/reviews")
-          .then((res) => res.json())
-          .then((data) => {
-            if (Array.isArray(data)) {
-              setReviews(data);
-            } else {
-              throw new Error("Invalid API response format");
-            }
-          })
-          .catch((apiErr) => {
-            console.error("All review API endpoints failed, falling back to localStorage/defaults:", apiErr);
-            const saved = localStorage.getItem("chasha_reviews");
-            if (saved) {
-              try {
-                setReviews(JSON.parse(saved));
-              } catch (e) {
-                setReviews(DEFAULT_REVIEWS);
-              }
-            } else {
-              setReviews(DEFAULT_REVIEWS);
-            }
-          });
-      });
+    // Subscribe to approved reviews in real-time
+    const unsubscribe = subscribeToApprovedReviews((list) => {
+      setReviews(list);
+    });
+    return () => unsubscribe();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !text.trim()) return;
+    if (!name.trim() || !text.trim() || isSubmitting) return;
 
+    setIsSubmitting(true);
     const initial = name.trim().charAt(0).toUpperCase() || "C";
-    const newReview = {
-      name: name.trim(),
-      initial,
-      text: text.trim(),
-      rating
-    };
 
-    // Optimistically update UI immediately for instant feedback
-    setReviews((prev) => [newReview, ...prev]);
-
-    // Reset input fields
-    setName("");
-    setText("");
-    setRating(5);
-    setIsSubmitted(true);
-
-    setTimeout(() => {
-      setIsSubmitted(false);
-    }, 4000);
-
-    // Save permanently to database (via direct GitHub client API write)
     try {
-      const updatedList = await submitReviewToGitHub(newReview);
-      setReviews(updatedList);
+      await submitReview({
+        name: name.trim(),
+        initial,
+        text: text.trim(),
+        rating
+      });
+
+      setName("");
+      setText("");
+      setRating(5);
+      setIsSubmitted(true);
+      setTimeout(() => {
+        setIsSubmitted(false);
+      }, 5000);
     } catch (err) {
-      console.warn("Failed direct client-side write to GitHub, falling back to /api/reviews:", err);
-      
-      // Fallback: Attempt local API route POST write
-      try {
-        const response = await fetch("/api/reviews", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(newReview),
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to write to fallback API");
-        }
-
-        const res = await fetch("/api/reviews");
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          setReviews(data);
-        }
-      } catch (fallbackErr) {
-        console.error("All persistent database writes failed. Saving locally to device:", fallbackErr);
-        // Backup: Save locally so user doesn't lose their input entirely
-        const updatedReviews = [newReview, ...reviews];
-        localStorage.setItem("chasha_reviews", JSON.stringify(updatedReviews));
-      }
+      console.error("Failed to submit review:", err);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -137,109 +65,105 @@ export function Testimonials() {
           <p className="section-desc">Don't just take our word for it — hear from our happy customers!</p>
         </div>
         <div className="testimonial-grid">
-          {reviews.map((r, i) => (
-            <div key={i} className="testimonial-card fade-in visible">
-              <div className="testimonial-quote"><i className="fas fa-quote-right"></i></div>
-              <p className="testimonial-text">{r.text}</p>
-              <div className="testimonial-author">
-                <div className="testimonial-avatar">{r.initial}</div>
-                <div>
-                  <div className="testimonial-name">{r.name}</div>
-                  <div className="testimonial-rating">
-                    {Array.from({ length: 5 }).map((_, idx) => (
-                      <i
-                        key={idx}
-                        className={idx < r.rating ? "fas fa-star" : "far fa-star"}
-                        style={{ color: "#f39c12", marginRight: "2px" }}
-                      />
-                    ))}
+          {reviews.length === 0 ? (
+            <div style={{ gridColumn: "1 / -1", textAlign: "center", color: "var(--text-light)" }}>
+              No reviews approved yet. Be the first to share your experience!
+            </div>
+          ) : (
+            reviews.map((r, i) => (
+              <div key={i} className="testimonial-card fade-in visible">
+                <div className="testimonial-quote"><i className="fas fa-quote-right"></i></div>
+                <p className="testimonial-text">{r.text}</p>
+                <div className="testimonial-author">
+                  <div className="testimonial-avatar">{r.initial}</div>
+                  <div>
+                    <div className="testimonial-name">{r.name}</div>
+                    <div className="testimonial-rating">
+                      {Array.from({ length: 5 }).map((_, idx) => (
+                        <i
+                          key={idx}
+                          className={idx < r.rating ? "fas fa-star" : "far fa-star"}
+                          style={{ color: "#f39c12", marginRight: "2px" }}
+                        />
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
 
         {/* Add Review Form */}
         <div className="review-form-wrapper">
           <div className="review-form-card">
             <h3>Share Your Experience</h3>
-            <p>Tell us what you loved about CHASHA BAKERS!</p>
+            <p>Tell us what you loved about CHASHA BAKERS! (Subject to admin approval)</p>
             
             {isSubmitted && (
               <div className="review-success-message">
                 <i className="fas fa-check-circle"></i>
-                Thank you! Your review has been added successfully.
+                Thank you! Your review has been submitted and is awaiting approval.
               </div>
             )}
 
-            {!isInitialized ? (
-              <div style={{ display: "flex", justifyContent: "center", padding: "20px" }}>
-                <div className="login-spinner" style={{ borderTopColor: "var(--primary)", width: "32px", height: "32px" }}></div>
+            <form onSubmit={handleSubmit}>
+              <div className="form-group">
+                <label>Your Rating</label>
+                <div className="star-rating">
+                  {Array.from({ length: 5 }).map((_, idx) => {
+                    const starValue = idx + 1;
+                    return (
+                      <button
+                        type="button"
+                        key={idx}
+                        className={`star-btn ${(hoverRating || rating) >= starValue ? "active" : ""}`}
+                        onClick={() => setRating(starValue)}
+                        onMouseEnter={() => setHoverRating(starValue)}
+                        onMouseLeave={() => setHoverRating(0)}
+                      >
+                        <i className={(hoverRating || rating) >= starValue ? "fas fa-star" : "far fa-star"}></i>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            ) : user ? (
-              <form onSubmit={handleSubmit}>
-                <div className="form-group">
-                  <label>Your Rating</label>
-                  <div className="star-rating">
-                    {Array.from({ length: 5 }).map((_, idx) => {
-                      const starValue = idx + 1;
-                      return (
-                        <button
-                          type="button"
-                          key={idx}
-                          className={`star-btn ${(hoverRating || rating) >= starValue ? "active" : ""}`}
-                          onClick={() => setRating(starValue)}
-                          onMouseEnter={() => setHoverRating(starValue)}
-                          onMouseLeave={() => setHoverRating(0)}
-                        >
-                          <i className={(hoverRating || rating) >= starValue ? "fas fa-star" : "far fa-star"}></i>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
 
-                <div className="form-row">
-                  <div className="form-group" style={{ width: "100%" }}>
-                    <label>Your Name</label>
-                    <input
-                      type="text"
-                      value={name}
-                      readOnly
-                      style={{ background: "var(--cream-dark)", cursor: "not-allowed" }}
-                      placeholder="Enter your name"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label>Review Description</label>
-                  <textarea
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    placeholder="Share details of your experience..."
+              <div className="form-row">
+                <div className="form-group" style={{ width: "100%" }}>
+                  <label>Your Name</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Enter your name"
                     required
-                  ></textarea>
+                    disabled={isSubmitting}
+                  />
                 </div>
-
-                <button type="submit" className="form-submit">
-                  <i className="fas fa-paper-plane"></i> Submit Review
-                </button>
-              </form>
-            ) : (
-              <div className="review-login-required">
-                <p>Verify your mobile number via OTP to submit a public review.</p>
-                <button
-                  type="button"
-                  className="review-login-btn"
-                  onClick={() => setShowLoginModal(true)}
-                >
-                  <i className="fas fa-mobile-alt"></i> Login via Mobile & OTP
-                </button>
               </div>
-            )}
+
+              <div className="form-group">
+                <label>Review Description</label>
+                <textarea
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  placeholder="Share details of your experience..."
+                  required
+                  disabled={isSubmitting}
+                ></textarea>
+              </div>
+
+              <button type="submit" className="form-submit" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <span className="login-spinner" style={{ margin: "0 auto" }}></span>
+                ) : (
+                  <>
+                    <i className="fas fa-paper-plane"></i> Submit Review
+                  </>
+                )}
+              </button>
+            </form>
           </div>
         </div>
       </div>
