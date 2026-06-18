@@ -63,17 +63,19 @@ let localAdminCredentials = { username: "admin", passwordHash: "8c6976e5b5410415
 // Check if we should use Firestore
 const useFirestore = isFirebaseConfigured && db !== null;
 
-// Helpers to seed Firestore with initial data if empty
+// Helpers to seed Firestore with initial data if empty or missing items
 export async function seedDatabaseIfEmpty() {
   if (!useFirestore || !db) return;
 
   try {
-    // 1. Seed Products
+    // 1. Seed Products (make sure all PRODUCTS are in Firestore)
     const productsCol = collection(db, "products");
     const productsSnap = await getDocs(productsCol);
-    if (productsSnap.empty) {
-      console.log("Seeding products in Firestore...");
-      for (const p of PRODUCTS) {
+    const existingIds = new Set(productsSnap.docs.map(doc => doc.id));
+
+    for (const p of PRODUCTS) {
+      if (!existingIds.has(p.id.toString())) {
+        console.log(`Seeding missing product in Firestore: ${p.name}`);
         await setDoc(doc(db, "products", p.id.toString()), {
           id: p.id,
           name: p.name,
@@ -122,6 +124,23 @@ if (typeof window !== "undefined") {
   seedDatabaseIfEmpty();
 }
 
+// Merge function to guarantee all static products are present and updated with DB edits
+export function mergeDbWithStaticProducts(dbProducts: DbProduct[]): DbProduct[] {
+  const productMap = new Map<number, DbProduct>();
+  
+  // Initialize with all static products
+  PRODUCTS.forEach((p) => {
+    productMap.set(p.id, { ...p, available: true });
+  });
+
+  // Overwrite or append with database products
+  dbProducts.forEach((p) => {
+    productMap.set(p.id, p);
+  });
+
+  return Array.from(productMap.values()).sort((a, b) => a.id - b.id);
+}
+
 // --- PRODUCT MANAGEMENT ---
 
 export async function fetchProducts(): Promise<DbProduct[]> {
@@ -143,8 +162,7 @@ export async function fetchProducts(): Promise<DbProduct[]> {
           available: data.available !== false
         });
       });
-      // Sort by ID to preserve order
-      return list.sort((a, b) => a.id - b.id);
+      return mergeDbWithStaticProducts(list);
     } catch (e) {
       console.error("Failed to fetch products from Firestore, falling back:", e);
     }
@@ -345,9 +363,10 @@ export function subscribeToProducts(callback: (products: DbProduct[]) => void) {
           available: data.available !== false
         });
       });
-      callback(list.sort((a, b) => a.id - b.id));
+      callback(mergeDbWithStaticProducts(list));
     }, (err) => {
       console.error("Error in products snapshot subscriber:", err);
+      callback(localProducts);
     });
   }
   
