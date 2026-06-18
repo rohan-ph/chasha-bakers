@@ -51,7 +51,7 @@ export interface DbOrder {
 }
 
 // Fallback in-memory database for local/offline testing
-let localProducts: DbProduct[] = PRODUCTS.map(p => ({ ...p, available: true }));
+export let localProducts: DbProduct[] = PRODUCTS.map(p => ({ ...p, available: true }));
 let localReviews: DbReview[] = [
   { name: "Anitha R.", initial: "A", text: "The chocolate truffle cake was absolutely divine! Best bakery in town. Every order has been consistent in quality. Highly recommend CHASHA BAKERS!", rating: 5, status: "approved", timestamp: new Date() },
   { name: "Priya S.", initial: "P", text: "Ordered a custom birthday cake for my daughter and it was stunning! The taste was even better than expected. Thank you for making her day special!", rating: 5, status: "approved", timestamp: new Date() },

@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { useCart } from "../context/CartContext";
-import { subscribeToProducts, DbProduct } from "../lib/db";
+import { subscribeToProducts, DbProduct, localProducts } from "../lib/db";
 
 export default function Menu({ onOrder }: { onOrder: (product: any) => void }) {
   const [filter, setFilter] = useState("all");
-  const [products, setProducts] = useState<DbProduct[]>([]);
+  const [products, setProducts] = useState<DbProduct[]>(localProducts);
   const { addToCart } = useCart();
 
   useEffect(() => {

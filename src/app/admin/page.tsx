@@ -15,7 +15,8 @@ import {
   subscribeToOrders,
   DbProduct,
   DbReview,
-  DbOrder
+  DbOrder,
+  localProducts
 } from "@/lib/db";
 import { isFirebaseConfigured, db } from "@/lib/firebase";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -54,7 +55,7 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<"products" | "orders" | "reviews">("products");
 
   // Real-time Data Lists
-  const [products, setProducts] = useState<DbProduct[]>([]);
+  const [products, setProducts] = useState<DbProduct[]>(localProducts);
   const [orders, setOrders] = useState<DbOrder[]>([]);
   const [reviews, setReviews] = useState<DbReview[]>([]);
 
