@@ -38,6 +38,17 @@ export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
+  const [loggedInUser, setLoggedInUser] = useState("admin");
+
+  // Change Credentials Modal State
+  const [isCredsModalOpen, setIsCredsModalOpen] = useState(false);
+  const [credsForm, setCredsForm] = useState({
+    newUsername: "",
+    newPassword: "",
+    confirmPassword: ""
+  });
+  const [credsError, setCredsError] = useState("");
+  const [credsLoading, setCredsLoading] = useState(false);
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<"products" | "orders" | "reviews">("products");
@@ -76,7 +87,11 @@ export default function AdminPage() {
       try {
         const res = await fetch("/api/admin/check");
         if (res.ok) {
+          const data = await res.json();
           setIsAuthenticated(true);
+          if (data.username) {
+            setLoggedInUser(data.username);
+          }
         } else {
           setIsAuthenticated(false);
         }
@@ -119,7 +134,11 @@ export default function AdminPage() {
       });
 
       if (res.ok) {
+        const data = await res.json();
         setIsAuthenticated(true);
+        if (data.username) {
+          setLoggedInUser(data.username);
+        }
         setLoginError("");
       } else {
         const data = await res.json();
@@ -140,6 +159,62 @@ export default function AdminPage() {
     setIsAuthenticated(false);
     setUsername("");
     setPassword("");
+  };
+
+  // Credentials Modal Handlers
+  const handleOpenCredsModal = () => {
+    setCredsForm({
+      newUsername: loggedInUser,
+      newPassword: "",
+      confirmPassword: ""
+    });
+    setCredsError("");
+    setIsCredsModalOpen(true);
+  };
+
+  const handleCredsSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCredsError("");
+
+    if (!credsForm.newUsername.trim()) {
+      setCredsError("Username is required.");
+      return;
+    }
+    if (credsForm.newPassword.length < 4) {
+      setCredsError("Password must be at least 4 characters long.");
+      return;
+    }
+    if (credsForm.newPassword !== credsForm.confirmPassword) {
+      setCredsError("Passwords do not match.");
+      return;
+    }
+
+    setCredsLoading(true);
+    try {
+      const res = await fetch("/api/admin/change-credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          oldUsername: loggedInUser,
+          newUsername: credsForm.newUsername.trim(),
+          newPassword: credsForm.newPassword
+        })
+      });
+
+      if (res.ok) {
+        alert("Credentials updated successfully! Please log in again with your new credentials.");
+        setIsAuthenticated(false);
+        setIsCredsModalOpen(false);
+        router.push("/admin");
+      } else {
+        const data = await res.json();
+        setCredsError(data.error || "Failed to update credentials.");
+      }
+    } catch (err) {
+      setCredsError("Connection error. Please try again.");
+    } finally {
+      setCredsLoading(false);
+    }
   };
 
   // Image upload handler (Firebase Storage, falls back to Base64 data URL)
@@ -417,9 +492,14 @@ export default function AdminPage() {
               </span>
             )}
           </div>
-          <button className="btn-secondary" onClick={handleLogout} style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
-            <i className="fas fa-sign-out-alt"></i> Logout Admin
-          </button>
+          <div style={{ display: "flex", gap: "10px" }}>
+            <button className="btn-secondary" onClick={handleOpenCredsModal} style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+              <i className="fas fa-key"></i> Change Credentials
+            </button>
+            <button className="btn-secondary" onClick={handleLogout} style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+              <i className="fas fa-sign-out-alt"></i> Logout Admin
+            </button>
+          </div>
         </div>
 
         {/* Navigation Tabs */}
@@ -901,6 +981,66 @@ export default function AdminPage() {
                 ))
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Change Credentials */}
+      {isCredsModalOpen && (
+        <div className="modal-overlay active" onClick={() => setIsCredsModalOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "450px" }}>
+            <button className="modal-close" onClick={() => setIsCredsModalOpen(false)}>
+              &times;
+            </button>
+            <h2 style={{ fontFamily: "Playfair Display, serif", fontSize: "1.6rem" }}>
+              Change Admin <span>Credentials</span>
+            </h2>
+            <p style={{ color: "var(--text-light)", fontSize: "0.9rem", marginBottom: "20px" }}>Update username and password to secure the portal.</p>
+
+            {credsError && (
+              <div className="login-error-banner" style={{ marginBottom: "16px" }}>
+                {credsError}
+              </div>
+            )}
+
+            <form onSubmit={handleCredsSubmit}>
+              <div className="form-group" style={{ marginBottom: "16px" }}>
+                <label>New Username *</label>
+                <input
+                  type="text"
+                  placeholder="admin"
+                  required
+                  value={credsForm.newUsername}
+                  onChange={(e) => setCredsForm({ ...credsForm, newUsername: e.target.value })}
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: "16px" }}>
+                <label>New Password *</label>
+                <input
+                  type="password"
+                  placeholder="••••••••"
+                  required
+                  value={credsForm.newPassword}
+                  onChange={(e) => setCredsForm({ ...credsForm, newPassword: e.target.value })}
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: "24px" }}>
+                <label>Confirm New Password *</label>
+                <input
+                  type="password"
+                  placeholder="••••••••"
+                  required
+                  value={credsForm.confirmPassword}
+                  onChange={(e) => setCredsForm({ ...credsForm, confirmPassword: e.target.value })}
+                />
+              </div>
+
+              <button type="submit" className="form-submit" disabled={credsLoading} style={{ width: "100%", height: "48px" }}>
+                {credsLoading ? "Updating..." : "Update Credentials"}
+              </button>
+            </form>
           </div>
         </div>
       )}

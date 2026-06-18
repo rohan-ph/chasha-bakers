@@ -46,7 +46,7 @@ export async function POST(request: Request) {
       const response = NextResponse.json({ success: true, username });
       // Set a session cookie (for production netlify / serverless environments)
       // Note: we can also verify this on `/admin` page
-      response.cookies.set("chasha_admin_session", "authenticated", {
+      response.cookies.set("chasha_admin_session", username, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "strict",

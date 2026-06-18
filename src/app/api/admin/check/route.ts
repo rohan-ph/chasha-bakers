@@ -5,8 +5,8 @@ export async function GET() {
   const cookieStore = await cookies();
   const session = cookieStore.get("chasha_admin_session");
   
-  if (session && session.value === "authenticated") {
-    return NextResponse.json({ authenticated: true });
+  if (session && session.value) {
+    return NextResponse.json({ authenticated: true, username: session.value });
   }
   
   return NextResponse.json({ authenticated: false }, { status: 401 });
