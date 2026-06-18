@@ -41,10 +41,18 @@ export default function CartDrawer() {
       return;
     }
 
+    // 1. Open popup window in the synchronous tick to bypass browser pop-up blockers
+    let newWindow: Window | null = null;
+    try {
+      newWindow = window.open("", "_blank");
+    } catch (e) {
+      console.warn("Failed to pre-open window, will redirect in current tab:", e);
+    }
+
     setIsLoading(true);
 
     try {
-      // 1. Prepare order items for DB
+      // 2. Prepare order items for DB
       const orderedItems = cart.map((item) => ({
         productId: item.product.id.toString(),
         name: item.product.name,
@@ -52,17 +60,36 @@ export default function CartDrawer() {
         qty: item.qty,
       }));
 
-      // 2. Save order to database (Firestore or local fallback)
-      const saved = await saveOrder({
-        customerName: formData.name.trim(),
-        customerPhone: cleanPhone,
-        items: orderedItems,
-        quantity: totalItems,
-        totalAmount: totalPrice,
-        notes: formData.notes.trim(),
-      });
+      // 3. Save order to database (with a 1.5-second timeout fallback so that offline database hangs do not block checkout)
+      let saved;
+      try {
+        saved = await Promise.race([
+          saveOrder({
+            customerName: formData.name.trim(),
+            customerPhone: cleanPhone,
+            items: orderedItems,
+            quantity: totalItems,
+            totalAmount: totalPrice,
+            notes: formData.notes.trim(),
+          }),
+          new Promise<any>((_, reject) =>
+            setTimeout(() => reject(new Error("Database write timeout")), 1500)
+          )
+        ]);
+      } catch (dbErr) {
+        console.error("Database save failed, using local generation:", dbErr);
+        saved = {
+          id: "CB" + Math.floor(100000 + Math.random() * 900000),
+          customerName: formData.name.trim(),
+          customerPhone: cleanPhone,
+          items: orderedItems,
+          quantity: totalItems,
+          totalAmount: totalPrice,
+          notes: formData.notes.trim(),
+        };
+      }
 
-      // 3. Generate WhatsApp text
+      // 4. Generate WhatsApp text
       const itemsListText = cart
         .map((item) => {
           const itemPriceText = item.product.price === 0 ? "Price depends" : `₹${item.product.price * item.qty}`;
@@ -75,15 +102,26 @@ export default function CartDrawer() {
         `Hi CHASHA BAKERS! 🧁\n\nI'd like to place an order:\n\nOrder ID: *${saved.id}*\n👤 Name: *${formData.name.trim()}*\n📱 Phone: *${formData.phone}*\n\n📦 Ordered Items:\n${itemsListText}\n\n💰 Total Amount: *${totalDisplay}*\n📝 Notes: ${formData.notes.trim() || "None"}\n\nPlease confirm my order. Thank you!`
       );
 
-      // 4. Redirect to WhatsApp
-      window.open(`https://wa.me/918296339002?text=${msg}`, "_blank");
+      const whatsappUrl = `https://wa.me/918296339002?text=${msg}`;
 
-      // 5. Success state cleanup
+      // 5. Redirect to WhatsApp
+      if (newWindow) {
+        newWindow.location.href = whatsappUrl;
+      } else {
+        window.location.href = whatsappUrl;
+      }
+
+      // 6. Success state cleanup
       clearCart();
       setIsCartOpen(false);
       setFormData({ name: "", phone: "", notes: "" });
     } catch (err: any) {
       console.error("Failed to save order:", err);
+      if (newWindow) {
+        try {
+          newWindow.close();
+        } catch (closeErr) {}
+      }
       setError("Failed to process order. Please try again.");
     } finally {
       setIsLoading(false);
