@@ -98,12 +98,12 @@ export function Testimonials() {
         <div className="review-form-wrapper">
           <div className="review-form-card">
             <h3>Share Your Experience</h3>
-            <p>Tell us what you loved about CHASHA BAKERS! (Subject to admin approval)</p>
+            <p>Tell us what you loved about CHASHA BAKERS!</p>
             
             {isSubmitted && (
               <div className="review-success-message">
                 <i className="fas fa-check-circle"></i>
-                Thank you! Your review has been submitted and is awaiting approval.
+                Thank you! Your review has been successfully posted.
               </div>
             )}
 

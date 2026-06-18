@@ -776,19 +776,9 @@ export default function AdminPage() {
                           </span>
                         </td>
                         <td>
-                          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                            {r.status !== "approved" && (
-                              <button className="admin-btn" onClick={() => handleApproveReview(r.id!)} style={{ background: "#e8f5e9", color: "#2e7d32" }}>
-                                Approve
-                              </button>
-                            )}
-                            {r.status !== "rejected" && (
-                              <button className="admin-btn" onClick={() => handleRejectReview(r.id!)} style={{ background: "#ffebee", color: "#c62828" }}>
-                                Reject
-                              </button>
-                            )}
-                            <button className="admin-btn" onClick={() => handleDeleteReview(r.id!)} style={{ background: "#f2f2f2", color: "#333" }}>
-                              Delete
+                          <div style={{ display: "flex", gap: "8px" }}>
+                            <button className="admin-btn admin-btn-delete" onClick={() => handleDeleteReview(r.id!)}>
+                              <i className="fas fa-trash"></i> Delete
                             </button>
                           </div>
                         </td>

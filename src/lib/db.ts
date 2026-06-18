@@ -50,14 +50,85 @@ export interface DbOrder {
   timestamp: any;
 }
 
+// Local storage keys for cross-tab persistence
+const LOCAL_STORAGE_KEYS = {
+  products: "chasha_local_products",
+  reviews: "chasha_local_reviews",
+  orders: "chasha_local_orders",
+};
+
+// Initial load helpers
+function getStoredProducts(): DbProduct[] {
+  if (typeof window === "undefined") return PRODUCTS.map(p => ({ ...p, available: true }));
+  try {
+    const val = localStorage.getItem(LOCAL_STORAGE_KEYS.products);
+    if (val) return JSON.parse(val);
+  } catch (e) {}
+  return PRODUCTS.map(p => ({ ...p, available: true }));
+}
+
+function getStoredReviews(): DbReview[] {
+  const defaultReviews: DbReview[] = [
+    { name: "Anitha R.", initial: "A", text: "The chocolate truffle cake was absolutely divine! Best bakery in town. Every order has been consistent in quality. Highly recommend CHASHA BAKERS!", rating: 5, status: "approved", timestamp: new Date() },
+    { name: "Priya S.", initial: "P", text: "Ordered a custom birthday cake for my daughter and it was stunning! The taste was even better than expected. Thank you for making her day special!", rating: 5, status: "approved", timestamp: new Date() },
+    { name: "Rohan K.", initial: "R", text: "Fresh, delicious, and beautifully packaged. The cookies are addictive! I've been ordering weekly for my family. Great service via WhatsApp too!", rating: 5, status: "approved", timestamp: new Date() }
+  ];
+  if (typeof window === "undefined") return defaultReviews;
+  try {
+    const val = localStorage.getItem(LOCAL_STORAGE_KEYS.reviews);
+    if (val) {
+      const parsed = JSON.parse(val);
+      return parsed.map((r: any) => ({
+        ...r,
+        timestamp: new Date(r.timestamp)
+      }));
+    }
+  } catch (e) {}
+  return defaultReviews;
+}
+
+function getStoredOrders(): DbOrder[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const val = localStorage.getItem(LOCAL_STORAGE_KEYS.orders);
+    if (val) {
+      const parsed = JSON.parse(val);
+      return parsed.map((o: any) => ({
+        ...o,
+        timestamp: new Date(o.timestamp)
+      }));
+    }
+  } catch (e) {}
+  return [];
+}
+
 // Fallback in-memory database for local/offline testing
-export let localProducts: DbProduct[] = PRODUCTS.map(p => ({ ...p, available: true }));
-let localReviews: DbReview[] = [
-  { name: "Anitha R.", initial: "A", text: "The chocolate truffle cake was absolutely divine! Best bakery in town. Every order has been consistent in quality. Highly recommend CHASHA BAKERS!", rating: 5, status: "approved", timestamp: new Date() },
-  { name: "Priya S.", initial: "P", text: "Ordered a custom birthday cake for my daughter and it was stunning! The taste was even better than expected. Thank you for making her day special!", rating: 5, status: "approved", timestamp: new Date() },
-  { name: "Rohan K.", initial: "R", text: "Fresh, delicious, and beautifully packaged. The cookies are addictive! I've been ordering weekly for my family. Great service via WhatsApp too!", rating: 5, status: "approved", timestamp: new Date() }
-];
-let localOrders: DbOrder[] = [];
+export let localProducts: DbProduct[] = getStoredProducts();
+let localReviews: DbReview[] = getStoredReviews();
+let localOrders: DbOrder[] = getStoredOrders();
+
+// Save helpers
+function saveLocalProducts() {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEYS.products, JSON.stringify(localProducts));
+  } catch (e) {}
+}
+
+function saveLocalReviews() {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEYS.reviews, JSON.stringify(localReviews));
+  } catch (e) {}
+}
+
+function saveLocalOrders() {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEYS.orders, JSON.stringify(localOrders));
+  } catch (e) {}
+}
+
 let localAdminCredentials = { username: "admin", passwordHash: "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918" }; // SHA256 of "admin"
 
 // Check if we should use Firestore
@@ -183,6 +254,7 @@ export async function addProduct(product: Omit<DbProduct, "id"> & { id?: number 
     await setDoc(doc(db, "products", nextId.toString()), fullProduct);
   } else {
     localProducts.push(fullProduct);
+    saveLocalProducts();
   }
   return fullProduct;
 }
@@ -200,6 +272,7 @@ export async function updateProduct(product: DbProduct): Promise<void> {
     });
   } else {
     localProducts = localProducts.map(p => p.id === product.id ? product : p);
+    saveLocalProducts();
   }
 }
 
@@ -208,6 +281,7 @@ export async function deleteProduct(productId: number): Promise<void> {
     await deleteDoc(doc(db, "products", productId.toString()));
   } else {
     localProducts = localProducts.filter(p => p.id !== productId);
+    saveLocalProducts();
   }
 }
 
@@ -250,38 +324,28 @@ export async function fetchReviews(approvedOnly = true): Promise<DbReview[]> {
 export async function submitReview(review: Omit<DbReview, "status" | "timestamp">): Promise<DbReview> {
   const newReview: DbReview = {
     ...review,
-    status: "pending", // Always pending until admin approves
-    timestamp: new Date()
+    status: "approved", // Post automatically and make visible to everyone
+    timestamp: new Date(),
+    id: Math.random().toString(36).substr(2, 9)
   };
 
+  // Update local memory list instantly so UI gets it immediately
+  localReviews = [newReview, ...localReviews];
+  saveLocalReviews();
+
   if (useFirestore && db) {
-    try {
-      const dbPromise = addDoc(collection(db, "reviews"), {
-        ...newReview,
-        timestamp: Timestamp.fromDate(newReview.timestamp)
-      });
-
-      // Prevent unhandled promise rejection if write fails in the background after timeout
-      dbPromise.catch((e) => {
-        console.warn("Background review write failed or timed out:", e);
-      });
-
-      const docRef = await Promise.race([
-        dbPromise,
-        new Promise<any>((_, reject) =>
-          setTimeout(() => reject(new Error("Database write timeout")), 1500)
-        )
-      ]);
+    // Run Firestore write in the background completely asynchronously.
+    // The user UI receives the returned review instantly and doesn't wait!
+    addDoc(collection(db, "reviews"), {
+      ...newReview,
+      timestamp: Timestamp.fromDate(newReview.timestamp)
+    }).then((docRef) => {
       newReview.id = docRef.id;
-    } catch (err) {
-      console.error("Failed to submit review to Firestore, falling back to local memory:", err);
-      newReview.id = Math.random().toString(36).substr(2, 9);
-      localReviews = [newReview, ...localReviews];
-    }
-  } else {
-    newReview.id = Math.random().toString(36).substr(2, 9);
-    localReviews = [newReview, ...localReviews];
+    }).catch((err) => {
+      console.warn("Background review write to Firestore failed:", err);
+    });
   }
+
   return newReview;
 }
 
@@ -290,6 +354,7 @@ export async function updateReviewStatus(reviewId: string, status: "approved" | 
     await updateDoc(doc(db, "reviews", reviewId), { status });
   } else {
     localReviews = localReviews.map(r => r.id === reviewId ? { ...r, status } : r);
+    saveLocalReviews();
   }
 }
 
@@ -298,6 +363,7 @@ export async function deleteReview(reviewId: string): Promise<void> {
     await deleteDoc(doc(db, "reviews", reviewId));
   } else {
     localReviews = localReviews.filter(r => r.id !== reviewId);
+    saveLocalReviews();
   }
 }
 
@@ -350,6 +416,7 @@ export async function saveOrder(order: Omit<DbOrder, "id" | "status" | "timestam
     });
   } else {
     localOrders = [newOrder, ...localOrders];
+    saveLocalOrders();
   }
   return newOrder;
 }
@@ -359,6 +426,7 @@ export async function updateOrderStatus(orderId: string, status: DbOrder["status
     await updateDoc(doc(db, "orders", orderId), { status });
   } else {
     localOrders = localOrders.map(o => o.id === orderId ? { ...o, status } : o);
+    saveLocalOrders();
   }
 }
 
@@ -388,8 +456,18 @@ export function subscribeToProducts(callback: (products: DbProduct[]) => void) {
     });
   }
   
-  // Non-firestore fallback trigger (instant return, no reactive updates unless custom system)
+  // Non-firestore fallback trigger (instant return + react on tab updates)
   callback(localProducts);
+  if (typeof window !== "undefined") {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === LOCAL_STORAGE_KEYS.products) {
+        localProducts = getStoredProducts();
+        callback(localProducts);
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }
   return () => {};
 }
 
@@ -417,6 +495,16 @@ export function subscribeToApprovedReviews(callback: (reviews: DbReview[]) => vo
     });
   }
   callback(localReviews.filter(r => r.status === "approved"));
+  if (typeof window !== "undefined") {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === LOCAL_STORAGE_KEYS.reviews) {
+        localReviews = getStoredReviews();
+        callback(localReviews.filter(r => r.status === "approved"));
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }
   return () => {};
 }
 
@@ -444,6 +532,16 @@ export function subscribeToAllReviews(callback: (reviews: DbReview[]) => void) {
     });
   }
   callback(localReviews);
+  if (typeof window !== "undefined") {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === LOCAL_STORAGE_KEYS.reviews) {
+        localReviews = getStoredReviews();
+        callback(localReviews);
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }
   return () => {};
 }
 
@@ -469,8 +567,19 @@ export function subscribeToOrders(callback: (orders: DbOrder[]) => void) {
       callback(list);
     }, (err) => {
       console.error("Error in admin orders snapshot subscriber:", err);
+      callback(localOrders);
     });
   }
   callback(localOrders);
+  if (typeof window !== "undefined") {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === LOCAL_STORAGE_KEYS.orders) {
+        localOrders = getStoredOrders();
+        callback(localOrders);
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }
   return () => {};
 }
