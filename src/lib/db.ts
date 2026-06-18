@@ -256,11 +256,18 @@ export async function submitReview(review: Omit<DbReview, "status" | "timestamp"
 
   if (useFirestore && db) {
     try {
+      const dbPromise = addDoc(collection(db, "reviews"), {
+        ...newReview,
+        timestamp: Timestamp.fromDate(newReview.timestamp)
+      });
+
+      // Prevent unhandled promise rejection if write fails in the background after timeout
+      dbPromise.catch((e) => {
+        console.warn("Background review write failed or timed out:", e);
+      });
+
       const docRef = await Promise.race([
-        addDoc(collection(db, "reviews"), {
-          ...newReview,
-          timestamp: Timestamp.fromDate(newReview.timestamp)
-        }),
+        dbPromise,
         new Promise<any>((_, reject) =>
           setTimeout(() => reject(new Error("Database write timeout")), 1500)
         )

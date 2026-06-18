@@ -75,15 +75,22 @@ export default function OrderModal({ isOpen, onClose, selectedProduct, products 
       // 2. Save order to database (with a 1.5-second timeout fallback)
       let saved;
       try {
+        const dbPromise = saveOrder({
+          customerName: formData.name.trim(),
+          customerPhone: cleanPhone,
+          items: [orderItem],
+          quantity: formData.qty,
+          totalAmount: totalPrice,
+          notes: formData.notes.trim(),
+        });
+
+        // Prevent unhandled promise rejection if write fails in background after timeout
+        dbPromise.catch((e) => {
+          console.warn("Background order write failed or timed out:", e);
+        });
+
         saved = await Promise.race([
-          saveOrder({
-            customerName: formData.name.trim(),
-            customerPhone: cleanPhone,
-            items: [orderItem],
-            quantity: formData.qty,
-            totalAmount: totalPrice,
-            notes: formData.notes.trim(),
-          }),
+          dbPromise,
           new Promise<any>((_, reject) =>
             setTimeout(() => reject(new Error("Database write timeout")), 1500)
           )

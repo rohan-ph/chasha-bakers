@@ -63,15 +63,22 @@ export default function CartDrawer() {
       // 3. Save order to database (with a 1.5-second timeout fallback so that offline database hangs do not block checkout)
       let saved;
       try {
+        const dbPromise = saveOrder({
+          customerName: formData.name.trim(),
+          customerPhone: cleanPhone,
+          items: orderedItems,
+          quantity: totalItems,
+          totalAmount: totalPrice,
+          notes: formData.notes.trim(),
+        });
+
+        // Prevent unhandled promise rejection if write fails in background after timeout
+        dbPromise.catch((e) => {
+          console.warn("Background order write failed or timed out:", e);
+        });
+
         saved = await Promise.race([
-          saveOrder({
-            customerName: formData.name.trim(),
-            customerPhone: cleanPhone,
-            items: orderedItems,
-            quantity: totalItems,
-            totalAmount: totalPrice,
-            notes: formData.notes.trim(),
-          }),
+          dbPromise,
           new Promise<any>((_, reject) =>
             setTimeout(() => reject(new Error("Database write timeout")), 1500)
           )
