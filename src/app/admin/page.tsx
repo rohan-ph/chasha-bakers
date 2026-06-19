@@ -305,7 +305,7 @@ export default function AdminPage() {
 
     try {
       if (editingProduct) {
-        await updateProduct({
+        const updatedProduct: DbProduct = {
           ...editingProduct,
           name: productForm.name.trim(),
           category: productForm.category,
@@ -314,9 +314,12 @@ export default function AdminPage() {
           image: productForm.image,
           badge: productForm.badge.trim(),
           available: productForm.available
-        });
+        };
+        await updateProduct(updatedProduct);
+        // Immediately update local state (optimistic UI)
+        setProducts(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
       } else {
-        await addProduct({
+        const newProduct = {
           name: productForm.name.trim(),
           category: productForm.category,
           price: productForm.price,
@@ -324,7 +327,10 @@ export default function AdminPage() {
           image: productForm.image,
           badge: productForm.badge.trim(),
           available: productForm.available
-        });
+        };
+        const saved = await addProduct(newProduct);
+        // Immediately update local state (optimistic UI)
+        setProducts(prev => [...prev, saved]);
       }
       setIsProductModalOpen(false);
     } catch (err: any) {
@@ -336,6 +342,8 @@ export default function AdminPage() {
     if (confirm("Are you sure you want to delete this product?")) {
       try {
         await deleteProduct(id);
+        // Immediately update local state (optimistic UI)
+        setProducts(prev => prev.filter(p => p.id !== id));
       } catch (err) {
         alert("Failed to delete product.");
       }
@@ -346,6 +354,8 @@ export default function AdminPage() {
   const handleApproveReview = async (id: string) => {
     try {
       await updateReviewStatus(id, "approved");
+      // Immediately update local state (optimistic UI)
+      setReviews(prev => prev.map(r => r.id === id ? { ...r, status: "approved" } : r));
     } catch (err) {
       alert("Failed to approve review.");
     }
@@ -354,6 +364,8 @@ export default function AdminPage() {
   const handleRejectReview = async (id: string) => {
     try {
       await updateReviewStatus(id, "rejected");
+      // Immediately update local state (optimistic UI)
+      setReviews(prev => prev.map(r => r.id === id ? { ...r, status: "rejected" } : r));
     } catch (err) {
       alert("Failed to reject review.");
     }
@@ -364,7 +376,6 @@ export default function AdminPage() {
       try {
         await deleteReview(id);
         // Immediately update React state — don't wait for Firestore snapshot
-        // (local reviews use random IDs that may not match Firestore doc IDs)
         setReviews(prev => prev.filter(r => r.id !== id));
       } catch (err) {
         alert("Failed to delete review.");
@@ -376,6 +387,8 @@ export default function AdminPage() {
   const handleStatusChange = async (orderId: string, newStatus: DbOrder["status"]) => {
     try {
       await updateOrderStatus(orderId, newStatus);
+      // Immediately update local state (optimistic UI)
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
     } catch (err) {
       alert("Failed to update status.");
     }
