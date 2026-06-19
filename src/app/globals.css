@@ -135,6 +135,23 @@ nav.scrolled {
 .nav-cta::after { display: none !important; }
 .nav-cta:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
 
+/* Cart button in nav */
+.nav-cart-btn {
+    position: relative;
+    background: transparent;
+    border: 2px solid var(--primary);
+    color: var(--primary);
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: var(--transition);
+}
+.nav-cart-btn:hover { background: var(--primary); color: white; transform: translateY(-2px); }
+/* On desktop: shown inside nav-links; on mobile: hidden (shown via mobile-cart-btn) */
+.mobile-cart-btn { display: none; }
+
 .nav-login-btn {
     background: transparent;
     color: var(--primary) !important;
@@ -844,6 +861,9 @@ footer {
 @media (max-width: 768px) {
     .nav-links { display: none; }
     .hamburger { display: flex; }
+    /* Show the mobile cart button on all mobiles */
+    .mobile-cart-btn { display: flex !important; }
+    .nav-container { position: relative; }
     .hero-title { font-size: 2.6rem; }
     .hero-script { font-size: 1.5rem; }
     .section-title { font-size: 2rem; }

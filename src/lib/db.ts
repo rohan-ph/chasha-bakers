@@ -496,23 +496,17 @@ export async function deleteOrder(orderId: string): Promise<void> {
 
 
 export function subscribeToProducts(callback: (products: DbProduct[]) => void) {
-  ensureLocalDataLoaded();
-  
-  // Instantly return local/cached data (static defaults + any additions) for zero-latency load!
-  callback(localProducts);
-
-  let hasReceivedSnapshot = false;
-
-  const timeoutId = setTimeout(() => {
-    if (!hasReceivedSnapshot) {
-      console.warn("Firestore products snapshot listener timed out");
-    }
-  }, 1500);
+  // Immediately show static default products so the page renders instantly (no blank flash)
+  // These are hardcoded fallbacks only — Firestore data will replace them quickly
+  callback(PRODUCTS.map(p => ({ ...p, available: true })));
 
   if (useFirestore && db) {
     const unsub = onSnapshot(query(collection(db, "products")), (snap) => {
-      hasReceivedSnapshot = true;
-      clearTimeout(timeoutId);
+      if (snap.empty) {
+        // Firestore is empty — show static defaults and seed
+        seedDatabaseIfEmpty().catch(() => {});
+        return;
+      }
       const list: DbProduct[] = [];
       snap.forEach((docSnap) => {
         const data = docSnap.data();
@@ -527,44 +521,24 @@ export function subscribeToProducts(callback: (products: DbProduct[]) => void) {
           available: data.available !== false
         });
       });
-      const merged = mergeDbWithStaticProducts(list);
-      // Cache products locally
-      localProducts = merged;
+      // Sort by id for consistent ordering
+      list.sort((a, b) => a.id - b.id);
+      // Push Firestore data to all listeners — always overwrites any local state
+      localProducts = list;
+      // Persist to localStorage so same-device navigations are snappy,
+      // but this is NEVER used as source of truth on other devices
       saveLocalProducts();
-      callback(merged);
+      callback(list);
     }, (err) => {
-      hasReceivedSnapshot = true;
-      clearTimeout(timeoutId);
-      console.error("Error in products snapshot subscriber:", err);
+      console.error("Error in products snapshot subscriber, falling back to static defaults:", err);
+      // Fall back to static defaults (NOT LocalStorage) so all devices show the same initial data
+      callback(PRODUCTS.map(p => ({ ...p, available: true })));
     });
 
-    if (typeof window !== "undefined") {
-      const handleStorage = (e: StorageEvent) => {
-        if (e.key === LOCAL_STORAGE_KEYS.products) {
-          localProducts = getStoredProducts();
-          callback(localProducts);
-        }
-      };
-      window.addEventListener("storage", handleStorage);
-      return () => {
-        unsub();
-        window.removeEventListener("storage", handleStorage);
-      };
-    }
     return unsub;
   }
 
-  clearTimeout(timeoutId);
-  if (typeof window !== "undefined") {
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === LOCAL_STORAGE_KEYS.products) {
-        localProducts = getStoredProducts();
-        callback(localProducts);
-      }
-    };
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
-  }
+  // Firebase not configured — just show static defaults forever
   return () => {};
 }
 

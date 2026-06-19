@@ -62,6 +62,15 @@ export default function Navbar() {
           <span></span>
           <span></span>
         </button>
+        {/* Always-visible cart button on mobile, sits next to hamburger */}
+        <button
+          className="nav-cart-btn mobile-cart-btn"
+          onClick={() => setIsCartOpen(true)}
+          title="View Cart"
+        >
+          <i className="fas fa-shopping-bag"></i>
+          {totalItems > 0 && <span className="cart-count">{totalItems}</span>}
+        </button>
       </div>
       <div className={`mobile-menu ${mobileMenuOpen ? "active" : ""}`}>
         <Link href="#home" onClick={() => setMobileMenuOpen(false)}>
