@@ -52,12 +52,15 @@ export default function OrderModal({ isOpen, onClose, selectedProduct, products 
       return;
     }
 
-    // 1. Open popup window in the synchronous tick to bypass browser pop-up blockers
+    // 1. Open popup window in the synchronous tick to bypass browser pop-up blockers (desktop only)
     let newWindow: Window | null = null;
-    try {
-      newWindow = window.open("", "_blank");
-    } catch (err) {
-      console.warn("Failed to pre-open window, will redirect in current tab:", err);
+    const isMobile = typeof navigator !== "undefined" && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (!isMobile) {
+      try {
+        newWindow = window.open("", "_blank");
+      } catch (err) {
+        console.warn("Failed to pre-open window, will redirect in current tab:", err);
+      }
     }
 
     setIsLoading(true);
