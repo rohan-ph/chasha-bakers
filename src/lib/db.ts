@@ -54,7 +54,6 @@ export interface DbOrder {
 const LOCAL_STORAGE_KEYS = {
   products: "chasha_local_products",
   reviews: "chasha_local_reviews",
-  orders: "chasha_local_orders",
 };
 
 
@@ -89,32 +88,16 @@ function getStoredReviews(): DbReview[] {
   return DEFAULT_REVIEWS;
 }
 
-function getStoredOrders(): DbOrder[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const val = localStorage.getItem(LOCAL_STORAGE_KEYS.orders);
-    if (val) {
-      const parsed = JSON.parse(val);
-      return parsed.map((o: any) => ({
-        ...o,
-        timestamp: new Date(o.timestamp)
-      }));
-    }
-  } catch (e) {}
-  return [];
-}
 
 // Fallback in-memory database initialized with static defaults to prevent SSR hydration mismatch
 export let localProducts: DbProduct[] = PRODUCTS.map(p => ({ ...p, available: true }));
 let localReviews: DbReview[] = [...DEFAULT_REVIEWS];
-let localOrders: DbOrder[] = [];
 
 let isLocalDataLoaded = false;
 export function ensureLocalDataLoaded() {
   if (typeof window === "undefined" || isLocalDataLoaded) return;
   localProducts = getStoredProducts();
   localReviews = getStoredReviews();
-  localOrders = getStoredOrders();
   isLocalDataLoaded = true;
 }
 
@@ -133,12 +116,6 @@ function saveLocalReviews() {
   } catch (e) {}
 }
 
-function saveLocalOrders() {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(LOCAL_STORAGE_KEYS.orders, JSON.stringify(localOrders));
-  } catch (e) {}
-}
 
 let localAdminCredentials = { username: "admin", passwordHash: "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918" }; // SHA256 of "admin"
 
@@ -441,10 +418,11 @@ export async function fetchOrders(): Promise<DbOrder[]> {
       });
       return list;
     } catch (e) {
-      console.error("Failed to fetch orders from Firestore, falling back:", e);
+      console.error("Failed to fetch orders from Firestore:", e);
+      throw e;
     }
   }
-  return localOrders.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+  return [];
 }
 
 export async function saveOrder(order: Omit<DbOrder, "id" | "status" | "timestamp">): Promise<DbOrder> {
@@ -465,11 +443,9 @@ export async function saveOrder(order: Omit<DbOrder, "id" | "status" | "timestam
       ...newOrder,
       timestamp: Timestamp.fromDate(newOrder.timestamp)
     });
+    return newOrder;
   }
-
-  localOrders = [newOrder, ...localOrders];
-  saveLocalOrders();
-  return newOrder;
+  throw new Error("Firestore database not configured.");
 }
 
 export async function updateOrderStatus(orderId: string, status: DbOrder["status"]): Promise<void> {
@@ -477,10 +453,9 @@ export async function updateOrderStatus(orderId: string, status: DbOrder["status
 
   if (useFirestore && db) {
     await updateDoc(doc(db, "orders", orderId), { status });
+    return;
   }
-
-  localOrders = localOrders.map(o => o.id === orderId ? { ...o, status } : o);
-  saveLocalOrders();
+  throw new Error("Firestore database not configured.");
 }
 
 export async function deleteOrder(orderId: string): Promise<void> {
@@ -488,10 +463,9 @@ export async function deleteOrder(orderId: string): Promise<void> {
 
   if (useFirestore && db) {
     await deleteDoc(doc(db, "orders", orderId));
+    return;
   }
-
-  localOrders = localOrders.filter(o => o.id !== orderId);
-  saveLocalOrders();
+  throw new Error("Firestore database not configured.");
 }
 
 
@@ -696,8 +670,8 @@ export function subscribeToAllReviews(callback: (reviews: DbReview[]) => void) {
 export function subscribeToOrders(callback: (orders: DbOrder[]) => void) {
   ensureLocalDataLoaded();
   
-  // Instantly return local/cached orders for zero-latency load!
-  callback(localOrders);
+  // Show an empty list initially while the real-time snapshot is loading
+  callback([]);
 
   let hasReceivedSnapshot = false;
 
@@ -727,9 +701,6 @@ export function subscribeToOrders(callback: (orders: DbOrder[]) => void) {
           timestamp: data.timestamp?.toDate() || new Date()
         });
       });
-      // Cache orders locally
-      localOrders = list;
-      saveLocalOrders();
       callback(list);
     }, (err) => {
       hasReceivedSnapshot = true;
@@ -737,32 +708,11 @@ export function subscribeToOrders(callback: (orders: DbOrder[]) => void) {
       console.error("Error in admin orders snapshot subscriber:", err);
     });
 
-    if (typeof window !== "undefined") {
-      const handleStorage = (e: StorageEvent) => {
-        if (e.key === LOCAL_STORAGE_KEYS.orders) {
-          localOrders = getStoredOrders();
-          callback(localOrders);
-        }
-      };
-      window.addEventListener("storage", handleStorage);
-      return () => {
-        unsub();
-        window.removeEventListener("storage", handleStorage);
-      };
-    }
-    return unsub;
+    return () => {
+      unsub();
+    };
   }
 
   clearTimeout(timeoutId);
-  if (typeof window !== "undefined") {
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === LOCAL_STORAGE_KEYS.orders) {
-        localOrders = getStoredOrders();
-        callback(localOrders);
-      }
-    };
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
-  }
   return () => {};
 }
