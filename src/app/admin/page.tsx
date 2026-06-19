@@ -220,6 +220,18 @@ export default function AdminPage() {
     }
   };
 
+  const dataURLtoFile = (dataurl: string, filename: string): File => {
+    const arr = dataurl.split(",");
+    const mime = arr[0].match(/:(.*?);/)?.[1] || "image/jpeg";
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new File([u8arr], filename, { type: mime });
+  };
+
   const compressImage = (file: File): Promise<{ compressedFile: File; base64: string }> => {
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -252,19 +264,13 @@ export default function AdminPage() {
           if (ctx) {
             ctx.drawImage(img, 0, 0, width, height);
             const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
-            
-            fetch(dataUrl)
-              .then(res => res.blob())
-              .then(blob => {
-                const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
-                  type: "image/jpeg",
-                  lastModified: Date.now()
-                });
-                resolve({ compressedFile, base64: dataUrl });
-              })
-              .catch(() => {
-                resolve({ compressedFile: file, base64: event.target?.result as string });
-              });
+            try {
+              const compressedFile = dataURLtoFile(dataUrl, file.name.replace(/\.[^/.]+$/, "") + ".jpg");
+              resolve({ compressedFile, base64: dataUrl });
+            } catch (err) {
+              console.error("dataURLtoFile conversion failed:", err);
+              resolve({ compressedFile: file, base64: dataUrl });
+            }
           } else {
             resolve({ compressedFile: file, base64: event.target?.result as string });
           }
@@ -925,8 +931,9 @@ export default function AdminPage() {
                       "teacakes",
                       "brownies",
                       "custom cakes",
+                      productForm.category.toLowerCase(),
                       ...products.map(p => p.category.toLowerCase()).filter(Boolean)
-                    ])).sort().map(cat => (
+                    ])).filter(Boolean).sort().map(cat => (
                       <option key={cat} value={cat}>
                         {cat.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")}
                       </option>
