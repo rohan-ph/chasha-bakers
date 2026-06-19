@@ -325,12 +325,20 @@ export default function AdminPage() {
 
       if (storage) {
         try {
-          const storageRef = ref(storage, `products/${Date.now()}_${compressedFile.name}`);
-          const snapshot = await uploadBytes(storageRef, compressedFile);
-          const downloadUrl = await getDownloadURL(snapshot.ref);
+          // Promise.race to enforce a 3-second timeout on the Firebase Storage upload
+          const downloadUrl = await Promise.race([
+            (async () => {
+              const storageRef = ref(storage, `products/${Date.now()}_${compressedFile.name}`);
+              const snapshot = await uploadBytes(storageRef, compressedFile);
+              return await getDownloadURL(snapshot.ref);
+            })(),
+            new Promise<string>((_, reject) =>
+              setTimeout(() => reject(new Error("Firebase upload timeout")), 3000)
+            )
+          ]);
           setProductForm(prev => ({ ...prev, image: downloadUrl }));
         } catch (err: any) {
-          console.error("Firebase image upload failed, falling back to compressed base64:", err);
+          console.warn("Firebase image upload failed or timed out, falling back to compressed base64:", err);
           setProductForm(prev => ({ ...prev, image: base64 }));
         }
       } else {
