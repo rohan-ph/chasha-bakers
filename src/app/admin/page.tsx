@@ -41,6 +41,7 @@ export default function AdminPage() {
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
   const [loggedInUser, setLoggedInUser] = useState("admin");
+  const [showPassword, setShowPassword] = useState(false);
 
   // Change Credentials Modal State
   const [isCredsModalOpen, setIsCredsModalOpen] = useState(false);
@@ -51,6 +52,8 @@ export default function AdminPage() {
   });
   const [credsError, setCredsError] = useState("");
   const [credsLoading, setCredsLoading] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<"products" | "orders" | "reviews">("products");
@@ -579,16 +582,39 @@ export default function AdminPage() {
             </div>
             <div className="form-group" style={{ marginBottom: "24px" }}>
               <label htmlFor="admin-password">Password</label>
-              <input
-                id="admin-password"
-                type="password"
-                placeholder="Enter password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={loginLoading}
-                style={{ width: "100%", padding: "12px", border: "2px solid var(--cream-dark)", borderRadius: "10px" }}
-              />
+              <div style={{ position: "relative" }}>
+                <input
+                  id="admin-password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={loginLoading}
+                  style={{ width: "100%", padding: "12px 45px 12px 12px", border: "2px solid var(--cream-dark)", borderRadius: "10px" }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{
+                    position: "absolute",
+                    right: "12px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "var(--primary)",
+                    padding: "6px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center"
+                  }}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  <i className={`fas ${showPassword ? "fa-eye-slash" : "fa-eye"}`} style={{ fontSize: "1.1rem" }}></i>
+                </button>
+              </div>
             </div>
 
             <button
@@ -1220,24 +1246,72 @@ export default function AdminPage() {
 
               <div className="form-group" style={{ marginBottom: "16px" }}>
                 <label>New Password *</label>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  required
-                  value={credsForm.newPassword}
-                  onChange={(e) => setCredsForm({ ...credsForm, newPassword: e.target.value })}
-                />
+                <div style={{ position: "relative" }}>
+                  <input
+                    type={showNewPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    required
+                    value={credsForm.newPassword}
+                    onChange={(e) => setCredsForm({ ...credsForm, newPassword: e.target.value })}
+                    style={{ paddingRight: "45px" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    style={{
+                      position: "absolute",
+                      right: "12px",
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: "var(--primary)",
+                      padding: "6px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center"
+                    }}
+                    aria-label={showNewPassword ? "Hide password" : "Show password"}
+                  >
+                    <i className={`fas ${showNewPassword ? "fa-eye-slash" : "fa-eye"}`} style={{ fontSize: "1.1rem" }}></i>
+                  </button>
+                </div>
               </div>
 
               <div className="form-group" style={{ marginBottom: "24px" }}>
                 <label>Confirm New Password *</label>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  required
-                  value={credsForm.confirmPassword}
-                  onChange={(e) => setCredsForm({ ...credsForm, confirmPassword: e.target.value })}
-                />
+                <div style={{ position: "relative" }}>
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    required
+                    value={credsForm.confirmPassword}
+                    onChange={(e) => setCredsForm({ ...credsForm, confirmPassword: e.target.value })}
+                    style={{ paddingRight: "45px" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    style={{
+                      position: "absolute",
+                      right: "12px",
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: "var(--primary)",
+                      padding: "6px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center"
+                    }}
+                    aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                  >
+                    <i className={`fas ${showConfirmPassword ? "fa-eye-slash" : "fa-eye"}`} style={{ fontSize: "1.1rem" }}></i>
+                  </button>
+                </div>
               </div>
 
               <button type="submit" className="form-submit" disabled={credsLoading} style={{ width: "100%", height: "48px" }}>
