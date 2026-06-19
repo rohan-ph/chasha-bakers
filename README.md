@@ -6,10 +6,10 @@
     <em>Defining the standard of premium baking. Taste the Magic, Live the Moment.</em>
   </p>
 
-  <img src="https://img.shields.io/badge/Netlify-Deployment-00AD9F?style=for-the-badge&logo=netlify&logoColor=white" alt="Netlify">
+  <img src="https://img.shields.io/badge/Vercel-Deployment-000000?style=for-the-badge&logo=vercel&logoColor=white" alt="Vercel">
   <img src="https://img.shields.io/badge/GitHub-Repo-black?style=for-the-badge&logo=github" alt="GitHub">
   <br><br>
-  <a href="https://chashabakers.netlify.app"><strong>🌐 Live Site Demo</strong></a>
+  <a href="https://chasha-bakers.vercel.app"><strong>🌐 Live Site Demo</strong></a>
 </div>
 
 ---
@@ -21,7 +21,7 @@
   <img src="https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React">
   <img src="https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind">
   <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript">
-  <img src="https://img.shields.io/badge/Netlify-00AD9F?style=for-the-badge&logo=netlify&logoColor=white" alt="Netlify">
+  <img src="https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white" alt="Vercel">
 </div>
 
 ---
@@ -67,7 +67,7 @@
 
 ### 🌐 Deployment
 
-Deployed and managed on **Netlify**.
-- **Live URL**: [https://chashabakers.netlify.app](https://chashabakers.netlify.app)
+Deployed and managed on **Vercel**.
+- **Live URL**: [https://chasha-bakers.vercel.app](https://chasha-bakers.vercel.app)
 - **Build Command**: `npm run build`
 - **Publish Directory**: `.next`
