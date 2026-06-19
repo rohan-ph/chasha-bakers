@@ -327,7 +327,7 @@ export async function fetchReviews(approvedOnly = true): Promise<DbReview[]> {
     try {
       const col = collection(db, "reviews");
       let q = approvedOnly 
-        ? query(col, where("status", "==", "approved"), orderBy("timestamp", "desc"))
+        ? query(col, where("status", "==", "approved"))
         : query(col, orderBy("timestamp", "desc"));
       
       const snap = await getDocs(q);
@@ -344,6 +344,9 @@ export async function fetchReviews(approvedOnly = true): Promise<DbReview[]> {
           timestamp: data.timestamp?.toDate() || new Date()
         });
       });
+      if (approvedOnly) {
+        list.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+      }
       return list;
     } catch (e) {
       console.error("Failed to fetch reviews from Firestore, falling back:", e);
@@ -569,7 +572,7 @@ export function subscribeToApprovedReviews(callback: (reviews: DbReview[]) => vo
   }, 1500);
 
   if (useFirestore && db) {
-    const q = query(collection(db, "reviews"), where("status", "==", "approved"), orderBy("timestamp", "desc"));
+    const q = query(collection(db, "reviews"), where("status", "==", "approved"));
     const unsub = onSnapshot(q, (snap) => {
       hasReceivedSnapshot = true;
       clearTimeout(timeoutId);
@@ -586,6 +589,8 @@ export function subscribeToApprovedReviews(callback: (reviews: DbReview[]) => vo
           timestamp: data.timestamp?.toDate() || new Date()
         });
       });
+      // Sort reviews client-side to bypass composite index requirement
+      list.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
       // Merge approved reviews into localReviews without losing pending/rejected reviews
       const approvedIds = new Set(list.map(r => r.id).filter(Boolean));
       localReviews = [
