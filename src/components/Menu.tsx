@@ -18,11 +18,14 @@ export default function Menu({ onOrder }: { onOrder: (product: any) => void }) {
   }, []);
 
   // Get unique categories from active products
-  const categories = ["all", "cupcakes", "donuts", "filled donuts", "muffins", "teacakes", "brownies", "custom cakes"];
+  const categories = [
+    "all",
+    ...Array.from(new Set(products.map(p => p.category.toLowerCase()).filter(Boolean))).sort()
+  ];
 
   const filteredProducts = filter === "all" 
     ? products 
-    : products.filter(p => p.category === filter);
+    : products.filter(p => p.category.toLowerCase() === filter.toLowerCase());
 
   return (
     <section className="section menu-section" id="menu">

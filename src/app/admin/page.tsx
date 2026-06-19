@@ -77,6 +77,8 @@ export default function AdminPage() {
   });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [productFormError, setProductFormError] = useState("");
+  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
 
   // Customer Order History Modal
   const [selectedCustomerPhone, setSelectedCustomerPhone] = useState<string | null>(null);
@@ -218,7 +220,66 @@ export default function AdminPage() {
     }
   };
 
-  // Image upload handler (Firebase Storage, falls back to Base64 data URL)
+  const compressImage = (file: File): Promise<{ compressedFile: File; base64: string }> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const MAX_WIDTH = 800;
+          const MAX_HEIGHT = 800;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+            
+            fetch(dataUrl)
+              .then(res => res.blob())
+              .then(blob => {
+                const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
+                  type: "image/jpeg",
+                  lastModified: Date.now()
+                });
+                resolve({ compressedFile, base64: dataUrl });
+              })
+              .catch(() => {
+                resolve({ compressedFile: file, base64: event.target?.result as string });
+              });
+          } else {
+            resolve({ compressedFile: file, base64: event.target?.result as string });
+          }
+        };
+        img.onerror = () => {
+          resolve({ compressedFile: file, base64: event.target?.result as string });
+        };
+      };
+      reader.onerror = () => {
+        resolve({ compressedFile: file, base64: "" });
+      };
+    });
+  };
+
+  // Image upload handler with client-side compression
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -226,37 +287,31 @@ export default function AdminPage() {
     setUploadingImage(true);
     setProductFormError("");
 
-    // Initialize Firebase Storage if configured
-    const storage = isFirebaseConfigured ? getStorage() : null;
+    try {
+      const { compressedFile, base64 } = await compressImage(file);
 
-    if (storage) {
-      try {
-        const storageRef = ref(storage, `products/${Date.now()}_${file.name}`);
-        const snapshot = await uploadBytes(storageRef, file);
-        const downloadUrl = await getDownloadURL(snapshot.ref);
-        setProductForm(prev => ({ ...prev, image: downloadUrl }));
-      } catch (err: any) {
-        console.error("Firebase image upload failed, falling back to base64:", err);
-        convertToBase64(file);
-      } finally {
-        setUploadingImage(false);
+      // Initialize Firebase Storage if configured
+      const storage = isFirebaseConfigured ? getStorage() : null;
+
+      if (storage) {
+        try {
+          const storageRef = ref(storage, `products/${Date.now()}_${compressedFile.name}`);
+          const snapshot = await uploadBytes(storageRef, compressedFile);
+          const downloadUrl = await getDownloadURL(snapshot.ref);
+          setProductForm(prev => ({ ...prev, image: downloadUrl }));
+        } catch (err: any) {
+          console.error("Firebase image upload failed, falling back to compressed base64:", err);
+          setProductForm(prev => ({ ...prev, image: base64 }));
+        }
+      } else {
+        setProductForm(prev => ({ ...prev, image: base64 }));
       }
-    } else {
-      convertToBase64(file);
+    } catch (err) {
+      console.error("Image processing failed:", err);
+      setProductFormError("Failed to process image.");
+    } finally {
+      setUploadingImage(false);
     }
-  };
-
-  const convertToBase64 = (file: File) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setProductForm(prev => ({ ...prev, image: reader.result as string }));
-      setUploadingImage(false);
-    };
-    reader.onerror = () => {
-      setProductFormError("Failed to read the file.");
-      setUploadingImage(false);
-    };
-    reader.readAsDataURL(file);
   };
 
   // Product CRUD Handlers
@@ -271,6 +326,8 @@ export default function AdminPage() {
       badge: "",
       available: true
     });
+    setShowNewCategoryInput(false);
+    setNewCategoryName("");
     setProductFormError("");
     setIsProductModalOpen(true);
   };
@@ -286,6 +343,8 @@ export default function AdminPage() {
       badge: product.badge || "",
       available: product.available !== false
     });
+    setShowNewCategoryInput(false);
+    setNewCategoryName("");
     setProductFormError("");
     setIsProductModalOpen(true);
   };
@@ -303,12 +362,22 @@ export default function AdminPage() {
       return;
     }
 
+    let categoryToSave = productForm.category;
+    if (showNewCategoryInput) {
+      const trimmed = newCategoryName.trim().toLowerCase();
+      if (!trimmed) {
+        setProductFormError("Please enter a category name.");
+        return;
+      }
+      categoryToSave = trimmed;
+    }
+
     try {
       if (editingProduct) {
         const updatedProduct: DbProduct = {
           ...editingProduct,
           name: productForm.name.trim(),
-          category: productForm.category,
+          category: categoryToSave,
           price: productForm.price,
           desc: productForm.desc.trim(),
           image: productForm.image,
@@ -321,7 +390,7 @@ export default function AdminPage() {
       } else {
         const newProduct = {
           name: productForm.name.trim(),
-          category: productForm.category,
+          category: categoryToSave,
           price: productForm.price,
           desc: productForm.desc.trim(),
           image: productForm.image,
@@ -838,19 +907,63 @@ export default function AdminPage() {
                 <div className="form-group">
                   <label>Category *</label>
                   <select
-                    value={productForm.category}
-                    onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
+                    value={showNewCategoryInput ? "new" : productForm.category}
+                    onChange={(e) => {
+                      if (e.target.value === "new") {
+                        setShowNewCategoryInput(true);
+                      } else {
+                        setShowNewCategoryInput(false);
+                        setProductForm({ ...productForm, category: e.target.value });
+                      }
+                    }}
                   >
-                    <option value="cupcakes">Cupcakes</option>
-                    <option value="donuts">Donuts</option>
-                    <option value="filled donuts">Filled Donuts</option>
-                    <option value="muffins">Muffins</option>
-                    <option value="teacakes">Teacakes</option>
-                    <option value="brownies">Brownies</option>
-                    <option value="custom cakes">Custom Cakes</option>
+                    {Array.from(new Set([
+                      "cupcakes",
+                      "donuts",
+                      "filled donuts",
+                      "muffins",
+                      "teacakes",
+                      "brownies",
+                      "custom cakes",
+                      ...products.map(p => p.category.toLowerCase()).filter(Boolean)
+                    ])).sort().map(cat => (
+                      <option key={cat} value={cat}>
+                        {cat.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")}
+                      </option>
+                    ))}
+                    <option value="new">+ Add New Category...</option>
                   </select>
                 </div>
               </div>
+
+              {showNewCategoryInput && (
+                <div className="form-group" style={{ marginTop: "-10px", marginBottom: "15px" }}>
+                  <label>New Category Name *</label>
+                  <div style={{ display: "flex", gap: "10px" }}>
+                    <input
+                      type="text"
+                      placeholder="e.g. Pastries, Macarons"
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      style={{ flexGrow: 1 }}
+                    />
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      style={{ padding: "8px 16px", borderRadius: "10px", margin: 0 }}
+                      onClick={() => {
+                        const val = newCategoryName.trim().toLowerCase();
+                        if (val) {
+                          setProductForm({ ...productForm, category: val });
+                          setShowNewCategoryInput(false);
+                        }
+                      }}
+                    >
+                      Confirm
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="admin-form-grid">
                 <div className="form-group">
