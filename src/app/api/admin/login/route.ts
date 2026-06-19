@@ -17,6 +17,7 @@ export async function POST(request: Request) {
 
     const inputHash = hashPassword(password);
     let isAuthenticated = false;
+    let dbAvailable = false;
 
     // Try Firestore first
     if (isFirebaseConfigured && db) {
@@ -27,6 +28,7 @@ export async function POST(request: Request) {
             setTimeout(() => reject(new Error("Database login check timeout")), 3000)
           )
         ]);
+        dbAvailable = true;
         if (adminDoc.exists()) {
           const data = adminDoc.data();
           if (data.passwordHash === inputHash) {
@@ -43,7 +45,12 @@ export async function POST(request: Request) {
       const fallbackUser = "admin";
       const fallbackHash = "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918"; // SHA256 of "admin"
       if (username === fallbackUser && inputHash === fallbackHash) {
-        isAuthenticated = true;
+        // If Firestore is configured and was responsive, do NOT allow the fallback credentials
+        // since the database is online and is the primary source of truth (where defaults have been seeded).
+        const isDbOnline = isFirebaseConfigured && db && dbAvailable;
+        if (!isDbOnline) {
+          isAuthenticated = true;
+        }
       }
     }
 
