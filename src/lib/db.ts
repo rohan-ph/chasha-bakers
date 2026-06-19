@@ -338,11 +338,16 @@ export async function submitReview(review: Omit<DbReview, "status" | "timestamp"
   if (useFirestore && db) {
     // Run Firestore write in the background completely asynchronously.
     // The user UI receives the returned review instantly and doesn't wait!
+    const tempId = newReview.id!;
     addDoc(collection(db, "reviews"), {
       ...newReview,
       timestamp: Timestamp.fromDate(newReview.timestamp)
     }).then((docRef) => {
+      // Replace the temporary local ID with the real Firestore doc ID
+      // so that future delete/update operations use the correct ID
       newReview.id = docRef.id;
+      localReviews = localReviews.map(r => r.id === tempId ? { ...r, id: docRef.id } : r);
+      saveLocalReviews();
     }).catch((err) => {
       console.warn("Background review write to Firestore failed:", err);
     });

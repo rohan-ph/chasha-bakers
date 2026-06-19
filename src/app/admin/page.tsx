@@ -363,6 +363,9 @@ export default function AdminPage() {
     if (confirm("Are you sure you want to permanently delete this review?")) {
       try {
         await deleteReview(id);
+        // Immediately update React state — don't wait for Firestore snapshot
+        // (local reviews use random IDs that may not match Firestore doc IDs)
+        setReviews(prev => prev.filter(r => r.id !== id));
       } catch (err) {
         alert("Failed to delete review.");
       }
