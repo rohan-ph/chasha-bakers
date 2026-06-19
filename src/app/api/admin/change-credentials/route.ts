@@ -50,7 +50,7 @@ export async function POST(request: Request) {
       } catch (err: any) {
         console.warn("Firestore credential update failed or timed out:", err);
         return NextResponse.json({
-          error: "Database update timed out. Please check your network and Firestore rules/status."
+          error: "Database update timed out. This usually happens because Cloud Firestore is disabled or not set up in your Firebase Console (project: chasha-bakers). Please enable Cloud Firestore in your console, or use the default credentials (admin / admin)."
         }, { status: 504 });
       }
     }
