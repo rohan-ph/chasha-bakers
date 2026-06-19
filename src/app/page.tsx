@@ -51,7 +51,7 @@ export default function Home() {
         />
 
         <a
-          href="https://wa.me/918296339002"
+          href="https://wa.me/919353995224"
           target="_blank"
           className="whatsapp-float"
           title="Chat on WhatsApp"

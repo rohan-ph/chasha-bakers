@@ -114,7 +114,7 @@ export default function OrderModal({ isOpen, onClose, selectedProduct, products 
         `Hi CHASHA BAKERS! 🧁\n\nI'd like to place an order:\n\nOrder ID: *${saved.id}*\n👤 Name: *${formData.name.trim()}*\n📱 Phone: *${formData.phone}*\n📦 Product: *${product.name}*\n🔢 Quantity: *${formData.qty}*\n💰 Total: *${totalDisplay}*\n📝 Notes: ${formData.notes.trim() || 'None'}\n\nPlease confirm my order. Thank you!`
       );
 
-      const whatsappUrl = `https://wa.me/918296339002?text=${msg}`;
+      const whatsappUrl = `https://wa.me/919353995224?text=${msg}`;
 
       // 4. Redirect to WhatsApp
       if (newWindow) {

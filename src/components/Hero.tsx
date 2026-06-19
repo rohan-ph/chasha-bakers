@@ -29,7 +29,7 @@ export default function Hero() {
               <i className="fas fa-utensils"></i> Explore Menu
             </a>
             <Link
-              href="https://wa.me/918296339002?text=Hi%20CHASHA%20BAKERS!%20I'd%20like%20to%20place%20an%20order."
+              href="https://wa.me/919353995224?text=Hi%20CHASHA%20BAKERS!%20I'd%20like%20to%20place%20an%20order."
               target="_blank"
               className="btn-secondary"
             >

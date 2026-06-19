@@ -109,7 +109,7 @@ export default function CartDrawer() {
         `Hi CHASHA BAKERS! 🧁\n\nI'd like to place an order:\n\nOrder ID: *${saved.id}*\n👤 Name: *${formData.name.trim()}*\n📱 Phone: *${formData.phone}*\n\n📦 Ordered Items:\n${itemsListText}\n\n💰 Total Amount: *${totalDisplay}*\n📝 Notes: ${formData.notes.trim() || "None"}\n\nPlease confirm my order. Thank you!`
       );
 
-      const whatsappUrl = `https://wa.me/918296339002?text=${msg}`;
+      const whatsappUrl = `https://wa.me/919353995224?text=${msg}`;
 
       // 5. Redirect to WhatsApp
       if (newWindow) {

@@ -183,7 +183,7 @@ export function Contact() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    const whatsappNumber = "918296339002"; // CHASHA BAKERS number
+    const whatsappNumber = "919353995224"; // CHASHA BAKERS number
     const text = `Hi CHASHA BAKERS! I'd like to get in touch.
     
 *Name:* ${formData.name}
@@ -218,14 +218,14 @@ Looking forward to hearing from you!`;
               <div className="contact-icon"><i className="fas fa-phone"></i></div>
               <div>
                 <h4>Phone</h4>
-                <p><a href="tel:+918296339002">+91 8296339002</a></p>
+                <p><a href="tel:+919353995224">+91 9353995224</a></p>
               </div>
             </div>
             <div className="contact-item">
               <div className="contact-icon"><i className="fas fa-envelope"></i></div>
               <div>
                 <h4>Email</h4>
-                <p><a href="mailto:charithaloganathan@gmail.com">charithaloganathan@gmail.com</a></p>
+                <p><a href="mailto:Chashabakers@gmail.com">Chashabakers@gmail.com</a></p>
               </div>
             </div>
           </div>
@@ -306,8 +306,8 @@ export function Footer() {
         </div>
         <div className="footer-col">
           <h4>Contact Info</h4>
-          <a href="tel:+918296339002"><i className="fas fa-phone"></i> +91 8296339002</a>
-          <a href="mailto:charithaloganathan@gmail.com"><i className="fas fa-envelope"></i> charithaloganathan@gmail.com</a>
+          <a href="tel:+919353995224"><i className="fas fa-phone"></i> +91 9353995224</a>
+          <a href="mailto:Chashabakers@gmail.com"><i className="fas fa-envelope"></i> Chashabakers@gmail.com</a>
         </div>
       </div>
       <div className="footer-bottom">
