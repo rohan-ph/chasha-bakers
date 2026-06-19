@@ -482,7 +482,18 @@ export async function updateOrderStatus(orderId: string, status: DbOrder["status
   }
 }
 
-// --- REAL-TIME LISTENERS ---
+export async function deleteOrder(orderId: string): Promise<void> {
+  ensureLocalDataLoaded();
+  localOrders = localOrders.filter(o => o.id !== orderId);
+  saveLocalOrders();
+
+  if (useFirestore && db) {
+    deleteDoc(doc(db, "orders", orderId))
+      .catch((err) => console.warn("Background deleteOrder to Firestore failed:", err));
+  }
+}
+
+
 
 export function subscribeToProducts(callback: (products: DbProduct[]) => void) {
   ensureLocalDataLoaded();

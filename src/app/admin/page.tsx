@@ -10,6 +10,7 @@ import {
   updateReviewStatus,
   deleteReview,
   updateOrderStatus,
+  deleteOrder,
   subscribeToProducts,
   subscribeToAllReviews,
   subscribeToOrders,
@@ -501,6 +502,18 @@ export default function AdminPage() {
     }
   };
 
+  const handleDeleteOrder = async (orderId: string) => {
+    if (confirm("Are you sure you want to permanently delete this order?")) {
+      try {
+        await deleteOrder(orderId);
+        // Immediately update local state (optimistic UI)
+        setOrders(prev => prev.filter(o => o.id !== orderId));
+      } catch (err) {
+        alert("Failed to delete order.");
+      }
+    }
+  };
+
   // Filter and search orders
   const filteredOrders = orders.filter((o) => {
     const query = orderSearch.toLowerCase();
@@ -823,17 +836,27 @@ export default function AdminPage() {
                           </span>
                         </td>
                         <td>
-                          <select
-                            value={o.status}
-                            onChange={(e) => handleStatusChange(o.id!, e.target.value as any)}
-                            style={{ padding: "6px 12px", border: "1px solid var(--cream-dark)", borderRadius: "6px", fontSize: "0.8rem" }}
-                          >
-                            <option value="New">New</option>
-                            <option value="Preparing">Preparing</option>
-                            <option value="Ready">Ready</option>
-                            <option value="Delivered">Delivered</option>
-                            <option value="Cancelled">Cancelled</option>
-                          </select>
+                          <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                            <select
+                              value={o.status}
+                              onChange={(e) => handleStatusChange(o.id!, e.target.value as any)}
+                              style={{ padding: "6px 12px", border: "1px solid var(--cream-dark)", borderRadius: "6px", fontSize: "0.8rem" }}
+                            >
+                              <option value="New">New</option>
+                              <option value="Preparing">Preparing</option>
+                              <option value="Ready">Ready</option>
+                              <option value="Delivered">Delivered</option>
+                              <option value="Cancelled">Cancelled</option>
+                            </select>
+                            <button
+                              className="admin-btn admin-btn-delete"
+                              onClick={() => handleDeleteOrder(o.id!)}
+                              title="Delete this order"
+                              style={{ padding: "6px 10px", fontSize: "0.8rem" }}
+                            >
+                              <i className="fas fa-trash"></i>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
