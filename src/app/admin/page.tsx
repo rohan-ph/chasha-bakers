@@ -1041,29 +1041,47 @@ export default function AdminPage() {
               <div className="form-group">
                 <label>Product Image *</label>
                 <div style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "10px" }}>
-                  <input
-                    type="text"
-                    placeholder="Paste image URL..."
-                    value={productForm.image}
-                    onChange={(e) => setProductForm({ ...productForm, image: e.target.value })}
-                    style={{ flexGrow: 1 }}
-                  />
-                  <span style={{ color: "var(--text-light)", fontSize: "0.85rem" }}>or</span>
-                  <label className="btn-secondary" style={{ padding: "8px 16px", fontSize: "0.85rem", cursor: "pointer", borderRadius: "10px", margin: 0, whiteSpace: "nowrap" }}>
-                    <i className="fas fa-upload"></i> Upload
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      style={{ display: "none" }}
-                    />
-                  </label>
+                  {productForm.image && productForm.image.startsWith("data:") ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexGrow: 1, padding: "10px 16px", border: "2px dashed #27ae60", borderRadius: "10px", background: "#ebf7ee", color: "#27ae60", fontWeight: "600", fontSize: "0.9rem" }}>
+                      <i className="fas fa-check-circle" style={{ color: "#27ae60" }}></i>
+                      <span>Image Uploaded Successfully</span>
+                      <button
+                        type="button"
+                        style={{ marginLeft: "auto", background: "none", border: "none", color: "#e74c3c", cursor: "pointer", fontWeight: "600", padding: 0 }}
+                        onClick={() => setProductForm(prev => ({ ...prev, image: "" }))}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <input
+                        type="text"
+                        placeholder="Paste image URL..."
+                        value={productForm.image}
+                        onChange={(e) => setProductForm({ ...productForm, image: e.target.value })}
+                        style={{ flexGrow: 1 }}
+                      />
+                      <span style={{ color: "var(--text-light)", fontSize: "0.85rem" }}>or</span>
+                      <label className="btn-secondary" style={{ padding: "8px 16px", fontSize: "0.85rem", cursor: "pointer", borderRadius: "10px", margin: 0, whiteSpace: "nowrap" }}>
+                        <i className="fas fa-upload"></i> Upload
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          style={{ display: "none" }}
+                        />
+                      </label>
+                    </>
+                  )}
                 </div>
                 {uploadingImage && <div style={{ fontSize: "0.85rem", color: "var(--primary-light)", margin: "5px 0" }}>Uploading/Processing Image...</div>}
                 {productForm.image && (
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px", background: "var(--cream)", padding: "10px", borderRadius: "10px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", background: "var(--cream)", padding: "10px", borderRadius: "10px", marginTop: "10px" }}>
                     <img src={productForm.image} alt="Preview" style={{ width: "60px", height: "60px", objectFit: "cover", borderRadius: "8px" }} />
-                    <span style={{ fontSize: "0.75rem", color: "var(--text-light)", wordBreak: "break-all" }}>{productForm.image}</span>
+                    <span style={{ fontSize: "0.75rem", color: "var(--text-light)", wordBreak: "break-all" }}>
+                      {productForm.image.startsWith("data:") ? "Local Image File (Compressed & Optimized)" : productForm.image}
+                    </span>
                   </div>
                 )}
               </div>
