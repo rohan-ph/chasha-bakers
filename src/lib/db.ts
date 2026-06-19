@@ -206,16 +206,33 @@ if (typeof window !== "undefined") {
   seedDatabaseIfEmpty();
 }
 
-// Merge function to guarantee all static products are present and updated with DB edits
 export function mergeDbWithStaticProducts(dbProducts: DbProduct[]): DbProduct[] {
   const productMap = new Map<number, DbProduct>();
   
-  // Initialize with all static products
+  // 1. Initialize with all static products
   PRODUCTS.forEach((p) => {
     productMap.set(p.id, { ...p, available: true });
   });
 
-  // Overwrite or append with database products
+  // 2. Add currently stored local products (so custom additions aren't wiped out by Firestore sync)
+  if (typeof window !== "undefined") {
+    try {
+      const val = localStorage.getItem(LOCAL_STORAGE_KEYS.products);
+      if (val) {
+        const parsed: DbProduct[] = JSON.parse(val);
+        parsed.forEach((p) => {
+          // If it's a custom/new product (e.g. timestamp ID or ID not in static PRODUCTS), preserve it
+          if (p && p.id && !PRODUCTS.some(sp => sp.id === p.id)) {
+            productMap.set(p.id, p);
+          }
+        });
+      }
+    } catch (e) {
+      console.warn("Failed to merge local products from localStorage:", e);
+    }
+  }
+
+  // 3. Overwrite or append with database products
   dbProducts.forEach((p) => {
     productMap.set(p.id, p);
   });
@@ -466,12 +483,15 @@ export async function updateOrderStatus(orderId: string, status: DbOrder["status
 
 export function subscribeToProducts(callback: (products: DbProduct[]) => void) {
   ensureLocalDataLoaded();
+  
+  // Instantly return local/cached data (static defaults + any additions) for zero-latency load!
+  callback(localProducts);
+
   let hasReceivedSnapshot = false;
 
   const timeoutId = setTimeout(() => {
     if (!hasReceivedSnapshot) {
-      console.warn("Firestore products snapshot listener timed out, falling back to local storage");
-      callback(localProducts);
+      console.warn("Firestore products snapshot listener timed out");
     }
   }, 1500);
 
@@ -502,16 +522,13 @@ export function subscribeToProducts(callback: (products: DbProduct[]) => void) {
       hasReceivedSnapshot = true;
       clearTimeout(timeoutId);
       console.error("Error in products snapshot subscriber:", err);
-      callback(localProducts);
     });
 
     if (typeof window !== "undefined") {
       const handleStorage = (e: StorageEvent) => {
         if (e.key === LOCAL_STORAGE_KEYS.products) {
           localProducts = getStoredProducts();
-          if (!hasReceivedSnapshot) {
-            callback(localProducts);
-          }
+          callback(localProducts);
         }
       };
       window.addEventListener("storage", handleStorage);
@@ -522,9 +539,8 @@ export function subscribeToProducts(callback: (products: DbProduct[]) => void) {
     }
     return unsub;
   }
-  
+
   clearTimeout(timeoutId);
-  callback(localProducts);
   if (typeof window !== "undefined") {
     const handleStorage = (e: StorageEvent) => {
       if (e.key === LOCAL_STORAGE_KEYS.products) {
@@ -540,12 +556,15 @@ export function subscribeToProducts(callback: (products: DbProduct[]) => void) {
 
 export function subscribeToApprovedReviews(callback: (reviews: DbReview[]) => void) {
   ensureLocalDataLoaded();
+  
+  // Instantly return local/cached approved reviews for zero-latency load!
+  callback(localReviews.filter(r => r.status === "approved"));
+
   let hasReceivedSnapshot = false;
 
   const timeoutId = setTimeout(() => {
     if (!hasReceivedSnapshot) {
-      console.warn("Firestore approved reviews snapshot listener timed out, falling back to local storage");
-      callback(localReviews.filter(r => r.status === "approved"));
+      console.warn("Firestore approved reviews snapshot listener timed out");
     }
   }, 1500);
 
@@ -579,16 +598,13 @@ export function subscribeToApprovedReviews(callback: (reviews: DbReview[]) => vo
       hasReceivedSnapshot = true;
       clearTimeout(timeoutId);
       console.error("Error in reviews snapshot subscriber:", err);
-      callback(localReviews.filter(r => r.status === "approved"));
     });
 
     if (typeof window !== "undefined") {
       const handleStorage = (e: StorageEvent) => {
         if (e.key === LOCAL_STORAGE_KEYS.reviews) {
           localReviews = getStoredReviews();
-          if (!hasReceivedSnapshot) {
-            callback(localReviews.filter(r => r.status === "approved"));
-          }
+          callback(localReviews.filter(r => r.status === "approved"));
         }
       };
       window.addEventListener("storage", handleStorage);
@@ -601,7 +617,6 @@ export function subscribeToApprovedReviews(callback: (reviews: DbReview[]) => vo
   }
 
   clearTimeout(timeoutId);
-  callback(localReviews.filter(r => r.status === "approved"));
   if (typeof window !== "undefined") {
     const handleStorage = (e: StorageEvent) => {
       if (e.key === LOCAL_STORAGE_KEYS.reviews) {
@@ -617,12 +632,15 @@ export function subscribeToApprovedReviews(callback: (reviews: DbReview[]) => vo
 
 export function subscribeToAllReviews(callback: (reviews: DbReview[]) => void) {
   ensureLocalDataLoaded();
+  
+  // Instantly return local/cached reviews for zero-latency load!
+  callback(localReviews);
+
   let hasReceivedSnapshot = false;
 
   const timeoutId = setTimeout(() => {
     if (!hasReceivedSnapshot) {
-      console.warn("Firestore reviews snapshot listener timed out, falling back to local storage");
-      callback(localReviews);
+      console.warn("Firestore reviews snapshot listener timed out");
     }
   }, 1500);
 
@@ -652,16 +670,13 @@ export function subscribeToAllReviews(callback: (reviews: DbReview[]) => void) {
       hasReceivedSnapshot = true;
       clearTimeout(timeoutId);
       console.error("Error in admin reviews snapshot subscriber:", err);
-      callback(localReviews);
     });
 
     if (typeof window !== "undefined") {
       const handleStorage = (e: StorageEvent) => {
         if (e.key === LOCAL_STORAGE_KEYS.reviews) {
           localReviews = getStoredReviews();
-          if (!hasReceivedSnapshot) {
-            callback(localReviews);
-          }
+          callback(localReviews);
         }
       };
       window.addEventListener("storage", handleStorage);
@@ -674,7 +689,6 @@ export function subscribeToAllReviews(callback: (reviews: DbReview[]) => void) {
   }
 
   clearTimeout(timeoutId);
-  callback(localReviews);
   if (typeof window !== "undefined") {
     const handleStorage = (e: StorageEvent) => {
       if (e.key === LOCAL_STORAGE_KEYS.reviews) {
@@ -690,12 +704,15 @@ export function subscribeToAllReviews(callback: (reviews: DbReview[]) => void) {
 
 export function subscribeToOrders(callback: (orders: DbOrder[]) => void) {
   ensureLocalDataLoaded();
+  
+  // Instantly return local/cached orders for zero-latency load!
+  callback(localOrders);
+
   let hasReceivedSnapshot = false;
 
   const timeoutId = setTimeout(() => {
     if (!hasReceivedSnapshot) {
-      console.warn("Firestore orders snapshot listener timed out, falling back to local storage");
-      callback(localOrders);
+      console.warn("Firestore orders snapshot listener timed out");
     }
   }, 1500);
 
@@ -727,16 +744,13 @@ export function subscribeToOrders(callback: (orders: DbOrder[]) => void) {
       hasReceivedSnapshot = true;
       clearTimeout(timeoutId);
       console.error("Error in admin orders snapshot subscriber:", err);
-      callback(localOrders);
     });
 
     if (typeof window !== "undefined") {
       const handleStorage = (e: StorageEvent) => {
         if (e.key === LOCAL_STORAGE_KEYS.orders) {
           localOrders = getStoredOrders();
-          if (!hasReceivedSnapshot) {
-            callback(localOrders);
-          }
+          callback(localOrders);
         }
       };
       window.addEventListener("storage", handleStorage);
@@ -749,7 +763,6 @@ export function subscribeToOrders(callback: (orders: DbOrder[]) => void) {
   }
 
   clearTimeout(timeoutId);
-  callback(localOrders);
   if (typeof window !== "undefined") {
     const handleStorage = (e: StorageEvent) => {
       if (e.key === LOCAL_STORAGE_KEYS.orders) {
