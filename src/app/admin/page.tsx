@@ -437,8 +437,11 @@ export default function AdminPage() {
           available: productForm.available
         };
         const saved = await addProduct(newProduct);
-        // Immediately update local state (optimistic UI)
-        setProducts(prev => [...prev, saved]);
+        // Immediately update local state (optimistic UI) if not already added by real-time listener
+        setProducts(prev => {
+          if (prev.some(p => p.id === saved.id)) return prev;
+          return [...prev, saved];
+        });
       }
       setIsProductModalOpen(false);
     } catch (err: any) {
