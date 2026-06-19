@@ -518,7 +518,7 @@ nav.scrolled {
 
 /* Testimonials */
 .testimonials-section { background: var(--white); }
-.testimonial-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+.testimonial-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 28px; }
 .testimonial-card {
     background: var(--cream); padding: 32px; border-radius: 20px;
     transition: var(--transition); position: relative;

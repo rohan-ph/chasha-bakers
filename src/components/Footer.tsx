@@ -18,6 +18,8 @@ export function Testimonials() {
   const [hoverRating, setHoverRating] = useState(0);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+  const INITIAL_COUNT = 3;
 
   useEffect(() => {
     // Subscribe to approved reviews in real-time
@@ -56,6 +58,8 @@ export function Testimonials() {
     }
   };
 
+  const displayedReviews = showAll ? reviews : reviews.slice(0, INITIAL_COUNT);
+
   return (
     <section className="section testimonials-section" id="testimonials">
       <div className="container">
@@ -70,7 +74,7 @@ export function Testimonials() {
               No reviews approved yet. Be the first to share your experience!
             </div>
           ) : (
-            reviews.map((r, i) => (
+            displayedReviews.map((r, i) => (
               <div key={i} className="testimonial-card fade-in visible">
                 <div className="testimonial-quote"><i className="fas fa-quote-right"></i></div>
                 <p className="testimonial-text">{r.text}</p>
@@ -93,6 +97,23 @@ export function Testimonials() {
             ))
           )}
         </div>
+
+        {/* Show More / Show Less Button */}
+        {reviews.length > INITIAL_COUNT && (
+          <div style={{ textAlign: "center", marginTop: "40px" }}>
+            <button
+              onClick={() => setShowAll(!showAll)}
+              className="btn-secondary"
+              style={{ display: "inline-flex", alignItems: "center", gap: "10px", padding: "12px 32px" }}
+            >
+              {showAll ? (
+                <><i className="fas fa-chevron-up"></i> Show Less</>
+              ) : (
+                <><i className="fas fa-chevron-down"></i> Show More Reviews ({reviews.length - INITIAL_COUNT} more)</>
+              )}
+            </button>
+          </div>
+        )}
 
         {/* Add Review Form */}
         <div className="review-form-wrapper">
