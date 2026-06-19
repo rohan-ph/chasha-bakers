@@ -69,9 +69,9 @@ function getStoredProducts(): DbProduct[] {
 
 function getStoredReviews(): DbReview[] {
   const defaultReviews: DbReview[] = [
-    { name: "Anitha R.", initial: "A", text: "The chocolate truffle cake was absolutely divine! Best bakery in town. Every order has been consistent in quality. Highly recommend CHASHA BAKERS!", rating: 5, status: "approved", timestamp: new Date() },
-    { name: "Priya S.", initial: "P", text: "Ordered a custom birthday cake for my daughter and it was stunning! The taste was even better than expected. Thank you for making her day special!", rating: 5, status: "approved", timestamp: new Date() },
-    { name: "Rohan K.", initial: "R", text: "Fresh, delicious, and beautifully packaged. The cookies are addictive! I've been ordering weekly for my family. Great service via WhatsApp too!", rating: 5, status: "approved", timestamp: new Date() }
+    { id: "rev-default-1", name: "Anitha R.", initial: "A", text: "The chocolate truffle cake was absolutely divine! Best bakery in town. Every order has been consistent in quality. Highly recommend CHASHA BAKERS!", rating: 5, status: "approved", timestamp: new Date() },
+    { id: "rev-default-2", name: "Priya S.", initial: "P", text: "Ordered a custom birthday cake for my daughter and it was stunning! The taste was even better than expected. Thank you for making her day special!", rating: 5, status: "approved", timestamp: new Date() },
+    { id: "rev-default-3", name: "Rohan K.", initial: "R", text: "Fresh, delicious, and beautifully packaged. The cookies are addictive! I've been ordering weekly for my family. Great service via WhatsApp too!", rating: 5, status: "approved", timestamp: new Date() }
   ];
   if (typeof window === "undefined") return defaultReviews;
   try {
@@ -470,7 +470,11 @@ export function subscribeToProducts(callback: (products: DbProduct[]) => void) {
           available: data.available !== false
         });
       });
-      callback(mergeDbWithStaticProducts(list));
+      const merged = mergeDbWithStaticProducts(list);
+      // Cache products locally
+      localProducts = merged;
+      saveLocalProducts();
+      callback(merged);
     }, (err) => {
       hasReceivedSnapshot = true;
       clearTimeout(timeoutId);
@@ -539,6 +543,13 @@ export function subscribeToApprovedReviews(callback: (reviews: DbReview[]) => vo
           timestamp: data.timestamp?.toDate() || new Date()
         });
       });
+      // Merge approved reviews into localReviews without losing pending/rejected reviews
+      const approvedIds = new Set(list.map(r => r.id).filter(Boolean));
+      localReviews = [
+        ...list,
+        ...localReviews.filter(r => r.status !== "approved" && !approvedIds.has(r.id))
+      ];
+      saveLocalReviews();
       callback(list);
     }, (err) => {
       hasReceivedSnapshot = true;
@@ -608,6 +619,9 @@ export function subscribeToAllReviews(callback: (reviews: DbReview[]) => void) {
           timestamp: data.timestamp?.toDate() || new Date()
         });
       });
+      // Cache all reviews locally
+      localReviews = list;
+      saveLocalReviews();
       callback(list);
     }, (err) => {
       hasReceivedSnapshot = true;
@@ -679,6 +693,9 @@ export function subscribeToOrders(callback: (orders: DbOrder[]) => void) {
           timestamp: data.timestamp?.toDate() || new Date()
         });
       });
+      // Cache orders locally
+      localOrders = list;
+      saveLocalOrders();
       callback(list);
     }, (err) => {
       hasReceivedSnapshot = true;
