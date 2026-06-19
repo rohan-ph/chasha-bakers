@@ -21,7 +21,12 @@ export async function POST(request: Request) {
     // Try Firestore first
     if (isFirebaseConfigured && db) {
       try {
-        const adminDoc = await getDoc(doc(db, "admin_credentials", username));
+        const adminDoc = await Promise.race([
+          getDoc(doc(db, "admin_credentials", username)),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Database login check timeout")), 3000)
+          )
+        ]);
         if (adminDoc.exists()) {
           const data = adminDoc.data();
           if (data.passwordHash === inputHash) {
@@ -29,7 +34,7 @@ export async function POST(request: Request) {
           }
         }
       } catch (e) {
-        console.error("Firestore admin credential check failed, checking fallback:", e);
+        console.warn("Firestore admin credential check failed or timed out, checking fallback:", e);
       }
     }
 

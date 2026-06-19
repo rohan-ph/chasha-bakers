@@ -29,15 +29,29 @@ export async function POST(request: Request) {
     const newHash = hashPassword(newPassword);
 
     if (isFirebaseConfigured && db) {
-      // Create new credentials document
-      await setDoc(doc(db, "admin_credentials", newUsername), {
-        username: newUsername,
-        passwordHash: newHash,
-      });
+      try {
+        await Promise.race([
+          (async () => {
+            // Create new credentials document
+            await setDoc(doc(db, "admin_credentials", newUsername), {
+              username: newUsername,
+              passwordHash: newHash,
+            });
 
-      // If username changed, delete the old document
-      if (oldUsername !== newUsername) {
-        await deleteDoc(doc(db, "admin_credentials", oldUsername));
+            // If username changed, delete the old document
+            if (oldUsername !== newUsername) {
+              await deleteDoc(doc(db, "admin_credentials", oldUsername));
+            }
+          })(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Database write timeout")), 3000)
+          ),
+        ]);
+      } catch (err: any) {
+        console.warn("Firestore credential update failed or timed out:", err);
+        return NextResponse.json({
+          error: "Database update timed out. Please check your network and Firestore rules/status."
+        }, { status: 504 });
       }
     }
 
