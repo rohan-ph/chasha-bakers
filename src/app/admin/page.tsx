@@ -234,54 +234,78 @@ export default function AdminPage() {
 
   const compressImage = (file: File): Promise<{ compressedFile: File; base64: string }> => {
     return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target?.result as string;
-        img.onload = () => {
-          const canvas = document.createElement("canvas");
-          const MAX_WIDTH = 800;
-          const MAX_HEIGHT = 800;
-          let width = img.width;
-          let height = img.height;
+      try {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const result = event.target?.result as string;
+            if (!result) {
+              resolve({ compressedFile: file, base64: "" });
+              return;
+            }
+            const img = new Image();
+            // Define handlers BEFORE setting img.src to prevent timing/cache bugs!
+            img.onload = () => {
+              try {
+                const canvas = document.createElement("canvas");
+                const MAX_WIDTH = 800;
+                const MAX_HEIGHT = 800;
+                let width = img.width;
+                let height = img.height;
 
-          if (width > height) {
-            if (width > MAX_WIDTH) {
-              height *= MAX_WIDTH / width;
-              width = MAX_WIDTH;
-            }
-          } else {
-            if (height > MAX_HEIGHT) {
-              width *= MAX_HEIGHT / height;
-              height = MAX_HEIGHT;
-            }
-          }
+                if (width > height) {
+                  if (width > MAX_WIDTH) {
+                    height *= MAX_WIDTH / width;
+                    width = MAX_WIDTH;
+                  }
+                } else {
+                  if (height > MAX_HEIGHT) {
+                    width *= MAX_HEIGHT / height;
+                    height = MAX_HEIGHT;
+                  }
+                }
 
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext("2d");
-          if (ctx) {
-            ctx.drawImage(img, 0, 0, width, height);
-            const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
-            try {
-              const compressedFile = dataURLtoFile(dataUrl, file.name.replace(/\.[^/.]+$/, "") + ".jpg");
-              resolve({ compressedFile, base64: dataUrl });
-            } catch (err) {
-              console.error("dataURLtoFile conversion failed:", err);
-              resolve({ compressedFile: file, base64: dataUrl });
-            }
-          } else {
-            resolve({ compressedFile: file, base64: event.target?.result as string });
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext("2d");
+                if (ctx) {
+                  ctx.drawImage(img, 0, 0, width, height);
+                  const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+                  try {
+                    const compressedFile = dataURLtoFile(dataUrl, file.name.replace(/\.[^/.]+$/, "") + ".jpg");
+                    resolve({ compressedFile, base64: dataUrl });
+                  } catch (err) {
+                    console.error("dataURLtoFile conversion failed:", err);
+                    resolve({ compressedFile: file, base64: dataUrl });
+                  }
+                } else {
+                  resolve({ compressedFile: file, base64: result });
+                }
+              } catch (err) {
+                console.error("Error in img.onload:", err);
+                resolve({ compressedFile: file, base64: result });
+              }
+            };
+            img.onerror = (err) => {
+              console.error("Error loading image in Image object:", err);
+              resolve({ compressedFile: file, base64: result });
+            };
+            // Set src last!
+            img.src = result;
+          } catch (err) {
+            console.error("Error in reader.onload:", err);
+            resolve({ compressedFile: file, base64: "" });
           }
         };
-        img.onerror = () => {
-          resolve({ compressedFile: file, base64: event.target?.result as string });
+        reader.onerror = (err) => {
+          console.error("FileReader error:", err);
+          resolve({ compressedFile: file, base64: "" });
         };
-      };
-      reader.onerror = () => {
+        reader.readAsDataURL(file);
+      } catch (err) {
+        console.error("Exception in compressImage outer block:", err);
         resolve({ compressedFile: file, base64: "" });
-      };
+      }
     });
   };
 
