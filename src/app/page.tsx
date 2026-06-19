@@ -24,6 +24,34 @@ export default function Home() {
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      // Prevent browser scroll restoration on refresh
+      if ("scrollRestoration" in window.history) {
+        window.history.scrollRestoration = "manual";
+      }
+
+      // Clear the hash from the URL to prevent section anchoring on refresh
+      if (window.location.hash) {
+        window.history.replaceState(
+          null,
+          "",
+          window.location.pathname + window.location.search
+        );
+      }
+
+      // Scroll to top immediately
+      window.scrollTo(0, 0);
+
+      // Scroll after a tiny layout settle tick to be absolutely sure
+      const t = setTimeout(() => {
+        window.scrollTo(0, 0);
+      }, 50);
+
+      return () => clearTimeout(t);
+    }
+  }, []);
+
   const handleOrderClick = (product: any) => {
     setSelectedProduct(product);
     setIsOrderModalOpen(true);
