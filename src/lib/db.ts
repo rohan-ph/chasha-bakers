@@ -57,6 +57,13 @@ const LOCAL_STORAGE_KEYS = {
   orders: "chasha_local_orders",
 };
 
+
+const DEFAULT_REVIEWS: DbReview[] = [
+  { id: "rev-default-1", name: "Anitha R.", initial: "A", text: "The chocolate truffle cake was absolutely divine! Best bakery in town. Every order has been consistent in quality. Highly recommend CHASHA BAKERS!", rating: 5, status: "approved", timestamp: new Date("2026-06-19T00:00:00Z") },
+  { id: "rev-default-2", name: "Priya S.", initial: "P", text: "Ordered a custom birthday cake for my daughter and it was stunning! The taste was even better than expected. Thank you for making her day special!", rating: 5, status: "approved", timestamp: new Date("2026-06-19T00:00:00Z") },
+  { id: "rev-default-3", name: "Rohan K.", initial: "R", text: "Fresh, delicious, and beautifully packaged. The cookies are addictive! I've been ordering weekly for my family. Great service via WhatsApp too!", rating: 5, status: "approved", timestamp: new Date("2026-06-19T00:00:00Z") }
+];
+
 // Initial load helpers
 function getStoredProducts(): DbProduct[] {
   if (typeof window === "undefined") return PRODUCTS.map(p => ({ ...p, available: true }));
@@ -68,12 +75,7 @@ function getStoredProducts(): DbProduct[] {
 }
 
 function getStoredReviews(): DbReview[] {
-  const defaultReviews: DbReview[] = [
-    { id: "rev-default-1", name: "Anitha R.", initial: "A", text: "The chocolate truffle cake was absolutely divine! Best bakery in town. Every order has been consistent in quality. Highly recommend CHASHA BAKERS!", rating: 5, status: "approved", timestamp: new Date() },
-    { id: "rev-default-2", name: "Priya S.", initial: "P", text: "Ordered a custom birthday cake for my daughter and it was stunning! The taste was even better than expected. Thank you for making her day special!", rating: 5, status: "approved", timestamp: new Date() },
-    { id: "rev-default-3", name: "Rohan K.", initial: "R", text: "Fresh, delicious, and beautifully packaged. The cookies are addictive! I've been ordering weekly for my family. Great service via WhatsApp too!", rating: 5, status: "approved", timestamp: new Date() }
-  ];
-  if (typeof window === "undefined") return defaultReviews;
+  if (typeof window === "undefined") return DEFAULT_REVIEWS;
   try {
     const val = localStorage.getItem(LOCAL_STORAGE_KEYS.reviews);
     if (val) {
@@ -84,7 +86,7 @@ function getStoredReviews(): DbReview[] {
       }));
     }
   } catch (e) {}
-  return defaultReviews;
+  return DEFAULT_REVIEWS;
 }
 
 function getStoredOrders(): DbOrder[] {
@@ -102,10 +104,19 @@ function getStoredOrders(): DbOrder[] {
   return [];
 }
 
-// Fallback in-memory database for local/offline testing
-export let localProducts: DbProduct[] = getStoredProducts();
-let localReviews: DbReview[] = getStoredReviews();
-let localOrders: DbOrder[] = getStoredOrders();
+// Fallback in-memory database initialized with static defaults to prevent SSR hydration mismatch
+export let localProducts: DbProduct[] = PRODUCTS.map(p => ({ ...p, available: true }));
+let localReviews: DbReview[] = [...DEFAULT_REVIEWS];
+let localOrders: DbOrder[] = [];
+
+let isLocalDataLoaded = false;
+export function ensureLocalDataLoaded() {
+  if (typeof window === "undefined" || isLocalDataLoaded) return;
+  localProducts = getStoredProducts();
+  localReviews = getStoredReviews();
+  localOrders = getStoredOrders();
+  isLocalDataLoaded = true;
+}
 
 // Save helpers
 function saveLocalProducts() {
@@ -215,6 +226,7 @@ export function mergeDbWithStaticProducts(dbProducts: DbProduct[]): DbProduct[] 
 // --- PRODUCT MANAGEMENT ---
 
 export async function fetchProducts(): Promise<DbProduct[]> {
+  ensureLocalDataLoaded();
   if (useFirestore && db) {
     try {
       const q = query(collection(db, "products"));
@@ -242,6 +254,7 @@ export async function fetchProducts(): Promise<DbProduct[]> {
 }
 
 export async function addProduct(product: Omit<DbProduct, "id"> & { id?: number }): Promise<DbProduct> {
+  ensureLocalDataLoaded();
   const nextId = product.id || (useFirestore ? Date.now() : (localProducts.length > 0 ? Math.max(...localProducts.map(p => p.id)) + 1 : 1));
   const fullProduct: DbProduct = {
     ...product,
@@ -261,6 +274,7 @@ export async function addProduct(product: Omit<DbProduct, "id"> & { id?: number 
 }
 
 export async function updateProduct(product: DbProduct): Promise<void> {
+  ensureLocalDataLoaded();
   localProducts = localProducts.map(p => p.id === product.id ? product : p);
   saveLocalProducts();
 
@@ -278,6 +292,7 @@ export async function updateProduct(product: DbProduct): Promise<void> {
 }
 
 export async function deleteProduct(productId: number): Promise<void> {
+  ensureLocalDataLoaded();
   localProducts = localProducts.filter(p => p.id !== productId);
   saveLocalProducts();
 
@@ -290,6 +305,7 @@ export async function deleteProduct(productId: number): Promise<void> {
 // --- REVIEW MANAGEMENT ---
 
 export async function fetchReviews(approvedOnly = true): Promise<DbReview[]> {
+  ensureLocalDataLoaded();
   if (useFirestore && db) {
     try {
       const col = collection(db, "reviews");
@@ -324,6 +340,7 @@ export async function fetchReviews(approvedOnly = true): Promise<DbReview[]> {
 }
 
 export async function submitReview(review: Omit<DbReview, "status" | "timestamp">): Promise<DbReview> {
+  ensureLocalDataLoaded();
   const newReview: DbReview = {
     ...review,
     status: "approved", // Post automatically and make visible to everyone
@@ -357,6 +374,7 @@ export async function submitReview(review: Omit<DbReview, "status" | "timestamp"
 }
 
 export async function updateReviewStatus(reviewId: string, status: "approved" | "rejected"): Promise<void> {
+  ensureLocalDataLoaded();
   localReviews = localReviews.map(r => r.id === reviewId ? { ...r, status } : r);
   saveLocalReviews();
 
@@ -367,6 +385,7 @@ export async function updateReviewStatus(reviewId: string, status: "approved" | 
 }
 
 export async function deleteReview(reviewId: string): Promise<void> {
+  ensureLocalDataLoaded();
   localReviews = localReviews.filter(r => r.id !== reviewId);
   saveLocalReviews();
 
@@ -379,6 +398,7 @@ export async function deleteReview(reviewId: string): Promise<void> {
 // --- ORDER MANAGEMENT ---
 
 export async function fetchOrders(): Promise<DbOrder[]> {
+  ensureLocalDataLoaded();
   if (useFirestore && db) {
     try {
       const q = query(collection(db, "orders"), orderBy("timestamp", "desc"));
@@ -407,6 +427,7 @@ export async function fetchOrders(): Promise<DbOrder[]> {
 }
 
 export async function saveOrder(order: Omit<DbOrder, "id" | "status" | "timestamp">): Promise<DbOrder> {
+  ensureLocalDataLoaded();
   // Generate a friendly human-readable order ID: e.g., CB-10492
   const orderNum = Math.floor(10000 + Math.random() * 90000);
   const orderId = `CB-${orderNum}`;
@@ -431,6 +452,7 @@ export async function saveOrder(order: Omit<DbOrder, "id" | "status" | "timestam
 }
 
 export async function updateOrderStatus(orderId: string, status: DbOrder["status"]): Promise<void> {
+  ensureLocalDataLoaded();
   localOrders = localOrders.map(o => o.id === orderId ? { ...o, status } : o);
   saveLocalOrders();
 
@@ -443,6 +465,7 @@ export async function updateOrderStatus(orderId: string, status: DbOrder["status
 // --- REAL-TIME LISTENERS ---
 
 export function subscribeToProducts(callback: (products: DbProduct[]) => void) {
+  ensureLocalDataLoaded();
   let hasReceivedSnapshot = false;
 
   const timeoutId = setTimeout(() => {
@@ -516,6 +539,7 @@ export function subscribeToProducts(callback: (products: DbProduct[]) => void) {
 }
 
 export function subscribeToApprovedReviews(callback: (reviews: DbReview[]) => void) {
+  ensureLocalDataLoaded();
   let hasReceivedSnapshot = false;
 
   const timeoutId = setTimeout(() => {
@@ -592,6 +616,7 @@ export function subscribeToApprovedReviews(callback: (reviews: DbReview[]) => vo
 }
 
 export function subscribeToAllReviews(callback: (reviews: DbReview[]) => void) {
+  ensureLocalDataLoaded();
   let hasReceivedSnapshot = false;
 
   const timeoutId = setTimeout(() => {
@@ -664,6 +689,7 @@ export function subscribeToAllReviews(callback: (reviews: DbReview[]) => void) {
 }
 
 export function subscribeToOrders(callback: (orders: DbOrder[]) => void) {
+  ensureLocalDataLoaded();
   let hasReceivedSnapshot = false;
 
   const timeoutId = setTimeout(() => {

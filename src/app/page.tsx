@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import About from "@/components/About";
@@ -10,11 +10,19 @@ import { Testimonials, Contact, Footer } from "@/components/Footer";
 import { CartProvider } from "../context/CartContext";
 import CartDrawer from "../components/CartDrawer";
 import OrderModal from "@/components/OrderModal";
-import { localProducts } from "@/lib/db";
+import { subscribeToProducts, DbProduct, localProducts } from "@/lib/db";
 
 export default function Home() {
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
+  const [products, setProducts] = useState<DbProduct[]>(localProducts);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToProducts((list) => {
+      setProducts(list);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const handleOrderClick = (product: any) => {
     setSelectedProduct(product);
@@ -39,7 +47,7 @@ export default function Home() {
           isOpen={isOrderModalOpen}
           onClose={() => setIsOrderModalOpen(false)}
           selectedProduct={selectedProduct}
-          products={localProducts}
+          products={products}
         />
 
         <a
