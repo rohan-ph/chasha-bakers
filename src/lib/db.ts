@@ -262,7 +262,8 @@ export async function fetchProducts(): Promise<DbProduct[]> {
           available: data.available !== false
         });
       });
-      return mergeDbWithStaticProducts(list);
+      list.sort((a, b) => a.id - b.id);
+      return list;
     } catch (e) {
       console.error("Failed to fetch products from Firestore, falling back:", e);
     }
@@ -280,23 +281,20 @@ export async function addProduct(product: Omit<DbProduct, "id"> & { id?: number 
     available: product.available !== false
   };
 
+  if (useFirestore && db) {
+    await setDoc(doc(db, "products", nextId.toString()), fullProduct);
+  }
+
   localProducts.push(fullProduct);
   saveLocalProducts();
-
-  if (useFirestore && db) {
-    setDoc(doc(db, "products", nextId.toString()), fullProduct)
-      .catch((err) => console.warn("Background addProduct to Firestore failed:", err));
-  }
   return fullProduct;
 }
 
 export async function updateProduct(product: DbProduct): Promise<void> {
   ensureLocalDataLoaded();
-  localProducts = localProducts.map(p => p.id === product.id ? product : p);
-  saveLocalProducts();
 
   if (useFirestore && db) {
-    updateDoc(doc(db, "products", product.id.toString()), {
+    await updateDoc(doc(db, "products", product.id.toString()), {
       name: product.name,
       category: product.category,
       price: product.price,
@@ -304,19 +302,22 @@ export async function updateProduct(product: DbProduct): Promise<void> {
       image: product.image,
       badge: product.badge || "",
       available: product.available
-    }).catch((err) => console.warn("Background updateProduct to Firestore failed:", err));
+    });
   }
+
+  localProducts = localProducts.map(p => p.id === product.id ? product : p);
+  saveLocalProducts();
 }
 
 export async function deleteProduct(productId: number): Promise<void> {
   ensureLocalDataLoaded();
-  localProducts = localProducts.filter(p => p.id !== productId);
-  saveLocalProducts();
 
   if (useFirestore && db) {
-    deleteDoc(doc(db, "products", productId.toString()))
-      .catch((err) => console.warn("Background deleteProduct to Firestore failed:", err));
+    await deleteDoc(doc(db, "products", productId.toString()));
   }
+
+  localProducts = localProducts.filter(p => p.id !== productId);
+  saveLocalProducts();
 }
 
 // --- REVIEW MANAGEMENT ---
@@ -395,24 +396,24 @@ export async function submitReview(review: Omit<DbReview, "status" | "timestamp"
 
 export async function updateReviewStatus(reviewId: string, status: "approved" | "rejected"): Promise<void> {
   ensureLocalDataLoaded();
-  localReviews = localReviews.map(r => r.id === reviewId ? { ...r, status } : r);
-  saveLocalReviews();
 
   if (useFirestore && db) {
-    updateDoc(doc(db, "reviews", reviewId), { status })
-      .catch((err) => console.warn("Background updateReviewStatus to Firestore failed:", err));
+    await updateDoc(doc(db, "reviews", reviewId), { status });
   }
+
+  localReviews = localReviews.map(r => r.id === reviewId ? { ...r, status } : r);
+  saveLocalReviews();
 }
 
 export async function deleteReview(reviewId: string): Promise<void> {
   ensureLocalDataLoaded();
-  localReviews = localReviews.filter(r => r.id !== reviewId);
-  saveLocalReviews();
 
   if (useFirestore && db) {
-    deleteDoc(doc(db, "reviews", reviewId))
-      .catch((err) => console.warn("Background deleteReview to Firestore failed:", err));
+    await deleteDoc(doc(db, "reviews", reviewId));
   }
+
+  localReviews = localReviews.filter(r => r.id !== reviewId);
+  saveLocalReviews();
 }
 
 // --- ORDER MANAGEMENT ---
@@ -459,46 +460,46 @@ export async function saveOrder(order: Omit<DbOrder, "id" | "status" | "timestam
     timestamp: new Date()
   };
 
-  localOrders = [newOrder, ...localOrders];
-  saveLocalOrders();
-
   if (useFirestore && db) {
-    setDoc(doc(db, "orders", orderId), {
+    await setDoc(doc(db, "orders", orderId), {
       ...newOrder,
       timestamp: Timestamp.fromDate(newOrder.timestamp)
-    }).catch((err) => console.warn("Background saveOrder to Firestore failed:", err));
+    });
   }
+
+  localOrders = [newOrder, ...localOrders];
+  saveLocalOrders();
   return newOrder;
 }
 
 export async function updateOrderStatus(orderId: string, status: DbOrder["status"]): Promise<void> {
   ensureLocalDataLoaded();
-  localOrders = localOrders.map(o => o.id === orderId ? { ...o, status } : o);
-  saveLocalOrders();
 
   if (useFirestore && db) {
-    updateDoc(doc(db, "orders", orderId), { status })
-      .catch((err) => console.warn("Background updateOrderStatus to Firestore failed:", err));
+    await updateDoc(doc(db, "orders", orderId), { status });
   }
+
+  localOrders = localOrders.map(o => o.id === orderId ? { ...o, status } : o);
+  saveLocalOrders();
 }
 
 export async function deleteOrder(orderId: string): Promise<void> {
   ensureLocalDataLoaded();
-  localOrders = localOrders.filter(o => o.id !== orderId);
-  saveLocalOrders();
 
   if (useFirestore && db) {
-    deleteDoc(doc(db, "orders", orderId))
-      .catch((err) => console.warn("Background deleteOrder to Firestore failed:", err));
+    await deleteDoc(doc(db, "orders", orderId));
   }
+
+  localOrders = localOrders.filter(o => o.id !== orderId);
+  saveLocalOrders();
 }
 
 
 
 export function subscribeToProducts(callback: (products: DbProduct[]) => void) {
-  // Immediately show static default products so the page renders instantly (no blank flash)
-  // These are hardcoded fallbacks only — Firestore data will replace them quickly
-  callback(PRODUCTS.map(p => ({ ...p, available: true })));
+  // Load local/cached products to prevent flashing static/old defaults
+  ensureLocalDataLoaded();
+  callback(localProducts);
 
   if (useFirestore && db) {
     const unsub = onSnapshot(query(collection(db, "products")), (snap) => {
