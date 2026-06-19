@@ -60,41 +60,15 @@ export default function CartDrawer() {
         qty: item.qty,
       }));
 
-      // 3. Save order to database (with a 1.5-second timeout fallback so that offline database hangs do not block checkout)
-      let saved;
-      try {
-        const dbPromise = saveOrder({
-          customerName: formData.name.trim(),
-          customerPhone: cleanPhone,
-          items: orderedItems,
-          quantity: totalItems,
-          totalAmount: totalPrice,
-          notes: formData.notes.trim(),
-        });
-
-        // Prevent unhandled promise rejection if write fails in background after timeout
-        dbPromise.catch((e) => {
-          console.warn("Background order write failed or timed out:", e);
-        });
-
-        saved = await Promise.race([
-          dbPromise,
-          new Promise<any>((_, reject) =>
-            setTimeout(() => reject(new Error("Database write timeout")), 1500)
-          )
-        ]);
-      } catch (dbErr) {
-        console.error("Database save failed, using local generation:", dbErr);
-        saved = {
-          id: "CB" + Math.floor(100000 + Math.random() * 900000),
-          customerName: formData.name.trim(),
-          customerPhone: cleanPhone,
-          items: orderedItems,
-          quantity: totalItems,
-          totalAmount: totalPrice,
-          notes: formData.notes.trim(),
-        };
-      }
+      // 3. Save order to database
+      const saved = await saveOrder({
+        customerName: formData.name.trim(),
+        customerPhone: cleanPhone,
+        items: orderedItems,
+        quantity: totalItems,
+        totalAmount: totalPrice,
+        notes: formData.notes.trim(),
+      });
 
       // 4. Generate WhatsApp text
       const itemsListText = cart

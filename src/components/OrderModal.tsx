@@ -72,41 +72,15 @@ export default function OrderModal({ isOpen, onClose, selectedProduct, products 
 
       const totalPrice = product.price * formData.qty;
 
-      // 2. Save order to database (with a 1.5-second timeout fallback)
-      let saved;
-      try {
-        const dbPromise = saveOrder({
-          customerName: formData.name.trim(),
-          customerPhone: cleanPhone,
-          items: [orderItem],
-          quantity: formData.qty,
-          totalAmount: totalPrice,
-          notes: formData.notes.trim(),
-        });
-
-        // Prevent unhandled promise rejection if write fails in background after timeout
-        dbPromise.catch((e) => {
-          console.warn("Background order write failed or timed out:", e);
-        });
-
-        saved = await Promise.race([
-          dbPromise,
-          new Promise<any>((_, reject) =>
-            setTimeout(() => reject(new Error("Database write timeout")), 1500)
-          )
-        ]);
-      } catch (dbErr) {
-        console.error("Database save failed, using local generation:", dbErr);
-        saved = {
-          id: "CB" + Math.floor(100000 + Math.random() * 900000),
-          customerName: formData.name.trim(),
-          customerPhone: cleanPhone,
-          items: [orderItem],
-          quantity: formData.qty,
-          totalAmount: totalPrice,
-          notes: formData.notes.trim(),
-        };
-      }
+      // 2. Save order to database
+      const saved = await saveOrder({
+        customerName: formData.name.trim(),
+        customerPhone: cleanPhone,
+        items: [orderItem],
+        quantity: formData.qty,
+        totalAmount: totalPrice,
+        notes: formData.notes.trim(),
+      });
 
       // 3. Generate WhatsApp text
       const totalDisplay = product.price === 0 ? "Price depends" : `₹${totalPrice}`;
